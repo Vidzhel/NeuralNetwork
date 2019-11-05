@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29409.12
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SymbolsRecognition", "SymbolsRecognitionLib\SymbolsRecognition.csproj", "{B706AE4F-0E32-47A3-9636-2CA4728C1FA1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SystemRecognitionLib", "Lib\SystemRecognitionLib.csproj", "{E4B24BDF-F31B-48DF-A54F-180A58A87619}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B706AE4F-0E32-47A3-9636-2CA4728C1FA1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B706AE4F-0E32-47A3-9636-2CA4728C1FA1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B706AE4F-0E32-47A3-9636-2CA4728C1FA1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B706AE4F-0E32-47A3-9636-2CA4728C1FA1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E4B24BDF-F31B-48DF-A54F-180A58A87619}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E4B24BDF-F31B-48DF-A54F-180A58A87619}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E4B24BDF-F31B-48DF-A54F-180A58A87619}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E4B24BDF-F31B-48DF-A54F-180A58A87619}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {2413712D-0202-4BFE-A9CD-9F6298B40E73}
+	EndGlobalSection
+EndGlobal
