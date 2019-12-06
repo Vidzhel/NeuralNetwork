@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SymbolsRecognitionLib
+namespace SymbolRecognitionLib
 {
-    class Class1
+    public class NeuralNetworkManager
     {
     }
 }

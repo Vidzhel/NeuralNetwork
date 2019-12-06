@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Drawing;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -19,7 +20,7 @@ namespace SymbolRecognitionLib
             testLabels = new double[testingLables.Length][];
             trainLabels = new double[trainingLables.Length][];
 
-            for (long label = 0; label < testingLables.Length; label++)
+            for (int label = 0; label < testingLables.Length; label++)
             {
                 double[] testingOutput = new double[10];
                 testingOutput[(int)testingLables[label]]++;
@@ -27,7 +28,7 @@ namespace SymbolRecognitionLib
                 testLabels[label] = testingOutput;
             }
 
-            for (long label = 0; label < trainingLables.Length; label++)
+            for (int label = 0; label < trainingLables.Length; label++)
             {
                 double[] trainingOutput = new double[10];
                 trainingOutput[(int)trainingLables[label]]++;
@@ -54,6 +55,21 @@ namespace SymbolRecognitionLib
             labels = ReadLabels(testLabels, count);
         }
 
+        public static Bitmap ConvertImageToBitmap(double[] image)
+        {
+            Bitmap bmp = new Bitmap(28, 28, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+
+            for (int row = 0; row < 28; row++)
+                for (int col = 0; col < 28; col++)
+                {
+                    int brightness = (int)(image[row * 28 + col] * 100);
+                    brightness = brightness == 0 ? 255 : brightness; 
+                    bmp.SetPixel(col, row, Color.FromArgb(brightness, brightness, brightness));
+                }
+
+            return bmp;
+        }
+
         public static double[][] ReadImages(string filePath, int? count)
         {
             var fileStream = decompress(new FileInfo(filePath));
@@ -66,7 +82,7 @@ namespace SymbolRecognitionLib
                     reader.ReadBytes(4); // First four bytes are a magic number, we don't need it as we know the structure of the file (3 demensions, ubyte type of data)
 
                     int imagesCount = BitConverter.ToInt32(reader.ReadBytes(4).Reverse().ToArray(), 0); // As the values incoded in big-endian, we need to reverse bytes
-                    imagesCount = count != null ? (int)count : imagesCount; 
+                    imagesCount = count != null ? (int)count : imagesCount;
                     int rowsCount = BitConverter.ToInt32(reader.ReadBytes(4).Reverse().ToArray(), 0);
                     int colsCount = BitConverter.ToInt32(reader.ReadBytes(4).Reverse().ToArray(), 0);
 

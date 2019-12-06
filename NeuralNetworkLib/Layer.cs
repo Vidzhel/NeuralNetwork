@@ -2,6 +2,7 @@
 
 namespace NeuralNetworkLib
 {
+    [Serializable]
     public enum LayerType
     {
         InputLayer,
@@ -9,25 +10,26 @@ namespace NeuralNetworkLib
         OutputLayer
     }
 
+    [Serializable]
     public class Layer
     {
         #region public Members
 
         public Neuron[] Neurons { get; private set; }
-        public long OutputsCount { get; private set; }
-        public long InputsCount { get; private set; }
+        public int OutputsCount { get; private set; }
+        public int InputsCount { get; private set; }
         public LayerType Type { get; private set; }
         public double[][] Weights { get; private set; }
 
         #endregion
 
 
-        public Layer(long NeuronsCount, long InputsCount, LayerType layerType, Function<double, double> activationFunction)
+        public Layer(int NeuronsCount, int InputsCount, LayerType layerType, Function<double, double> activationFunction)
         {
             Neurons = new Neuron[NeuronsCount];
             Type = layerType;
 
-            for (long i = 0; i < Neurons.Length; i++)
+            for (int i = 0; i < Neurons.Length; i++)
                 Neurons[i] = new Neuron(InputsCount, layerType, activationFunction);
 
             OutputsCount = NeuronsCount;
@@ -47,7 +49,7 @@ namespace NeuralNetworkLib
 
             double[] outputs = new double[OutputsCount];
 
-            for (long i = 0; i < Neurons.Length; i++)
+            for (int i = 0; i < Neurons.Length; i++)
                 outputs[i] = Neurons[i].FeedForward(inputs);
 
             return outputs;
@@ -60,7 +62,7 @@ namespace NeuralNetworkLib
 
             double[] deltas = new double[errors.Length];
 
-            for (long i = 0; i < Neurons.Length; i++)
+            for (int i = 0; i < Neurons.Length; i++)
                 deltas[i] = Neurons[i].BackPropagation(errors[i], learningRate);
 
             return deltas;
@@ -77,7 +79,7 @@ namespace NeuralNetworkLib
             double[] thisLayerErrors = propagateErrors(nextLayerDeltas, nextLayerWeights);
             double[] thisLaterDeltas = new double[thisLayerErrors.Length];
 
-            for (long i = 0; i < Neurons.Length; i++)
+            for (int i = 0; i < Neurons.Length; i++)
                 thisLaterDeltas[i] = Neurons[i].BackPropagation(thisLayerErrors[i], learningRate);
 
             return thisLaterDeltas;
@@ -111,7 +113,7 @@ namespace NeuralNetworkLib
         {
             double[][] weights = new double[Neurons.Length][];
 
-            for (long neuron = 0; neuron < Neurons.Length; neuron++)
+            for (int neuron = 0; neuron < Neurons.Length; neuron++)
                 weights[neuron] = Neurons[neuron].Weights;
 
             Weights = weights;
@@ -127,8 +129,8 @@ namespace NeuralNetworkLib
         {
             double[] thisLayerErrors = new double[Neurons.Length];
 
-            for (long neuron = 0; neuron < Neurons.Length; neuron++)
-                for (long neuronNextLayer = 0; neuronNextLayer < nextLayerErrors.Length; neuronNextLayer++)
+            for (int neuron = 0; neuron < Neurons.Length; neuron++)
+                for (int neuronNextLayer = 0; neuronNextLayer < nextLayerErrors.Length; neuronNextLayer++)
                     thisLayerErrors[neuron] += nextLayerErrors[neuronNextLayer] * nextLayerWeights[neuronNextLayer][neuron];
 
             return thisLayerErrors;

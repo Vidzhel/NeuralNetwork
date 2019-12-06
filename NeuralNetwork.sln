@@ -3,11 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29409.12
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SymbolsRecognition", "SymbolsRecognition\SymbolsRecognition.csproj", "{B706AE4F-0E32-47A3-9636-2CA4728C1FA1}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NeuralNetworkLib", "NeuralNetworkLib\NeuralNetworkLib.csproj", "{E4B24BDF-F31B-48DF-A54F-180A58A87619}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SymbolRecognitionLib", "SymbolRecognitionLib\SymbolRecognitionLib.csproj", "{CECC957A-5C62-4E58-A26B-B2E874187716}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SymbolsRecognition", "SymbolsRecognition\SymbolsRecognition.csproj", "{3D8F63A3-CBB0-4309-8C42-2E334EF75BD7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,10 +15,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{B706AE4F-0E32-47A3-9636-2CA4728C1FA1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{B706AE4F-0E32-47A3-9636-2CA4728C1FA1}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{B706AE4F-0E32-47A3-9636-2CA4728C1FA1}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B706AE4F-0E32-47A3-9636-2CA4728C1FA1}.Release|Any CPU.Build.0 = Release|Any CPU
 		{E4B24BDF-F31B-48DF-A54F-180A58A87619}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{E4B24BDF-F31B-48DF-A54F-180A58A87619}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E4B24BDF-F31B-48DF-A54F-180A58A87619}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -27,6 +23,10 @@ Global
 		{CECC957A-5C62-4E58-A26B-B2E874187716}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CECC957A-5C62-4E58-A26B-B2E874187716}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CECC957A-5C62-4E58-A26B-B2E874187716}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3D8F63A3-CBB0-4309-8C42-2E334EF75BD7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3D8F63A3-CBB0-4309-8C42-2E334EF75BD7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3D8F63A3-CBB0-4309-8C42-2E334EF75BD7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3D8F63A3-CBB0-4309-8C42-2E334EF75BD7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

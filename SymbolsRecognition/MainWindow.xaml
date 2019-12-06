@@ -1,0 +1,67 @@
+﻿<Window x:Class="SymbolsRecognition.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:i="clr-namespace:System.Windows.Interactivity;assembly=System.Windows.Interactivity"
+        xmlns:local="clr-namespace:SymbolsRecognition"
+        
+        mc:Ignorable="d"
+        Title="Symbols Recognition" Height="450" Width="800">
+    <Grid>
+
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="5*"/>
+        </Grid.ColumnDefinitions>
+
+        <StackPanel Margin="10">
+            <Button Content="Open" Margin="0 0 0 10"/>
+            <Button Content="Save" Margin="0 0 0 10"/>
+        </StackPanel>
+
+        <TabControl Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" DataContext="{Binding CurrentViewModel}">
+
+            <TabItem Header="Draw Board">
+                <StackPanel Margin="5">
+                    <Border Name="CanvasBorder" BorderThickness="2" BorderBrush="AntiqueWhite" Height="250">
+                        <InkCanvas  Name="Canvas" ResizeEnabled="False" DefaultDrawingAttributes="{Binding Brush}"
+                                    MaxWidth="{Binding ActualWidth, ElementName=CanvasBorder}"
+                                    MaxHeight="{Binding ActualHeight, ElementName=CanvasBorder}">
+                            <i:Interaction.Triggers>
+                                <i:EventTrigger EventName="Loaded">
+                                    <i:InvokeCommandAction Command="{Binding OnCanvasLoaded}" CommandParameter="{Binding ElementName=Canvas}"/>
+                                </i:EventTrigger>
+                            </i:Interaction.Triggers>
+                        </InkCanvas>
+                    </Border>
+                    <StackPanel Orientation="Horizontal" Margin="0 5">
+                        <StackPanel>
+                            <RadioButton Content="Brush" IsChecked="{Binding IsBrush}"/>
+                            <RadioButton Content="Eraser"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="10 5 0 5">
+                            <TextBlock Text="Brush size:" Margin="0 0 10 0"/>
+                            <TextBox Width="50" Text="{Binding BrushSize}"/>
+                        </StackPanel>
+
+                        <Button Content="Clear Canvas" Width="80" HorizontalAlignment="Left" Margin="70 0 5 0" VerticalContentAlignment="Center" Height="22" Command="{Binding ClearCanvas}" CommandParameter="{Binding ElementName=Canvas}"/>
+
+                        <StackPanel Margin="180 0 0 0">
+                            <CheckBox Content="Show border boxes" IsChecked="{Binding ShowBorderBoxes}"/>
+                            <CheckBox Content="Clasify results" IsChecked="{Binding IsBrush}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Button Content="Precess" Width="80" HorizontalAlignment="Left" Margin="0 10 5 5" VerticalContentAlignment="Center" Height="22" Command="{Binding ProcessUserInput}" CommandParameter="{Binding ElementName=Canvas}"/>
+                    <TextBlock Text="Result:"/>
+                    <TextBox Width="200" Margin="0" Text="{Binding Output}" IsReadOnly="True" HorizontalAlignment="Left"/>
+                </StackPanel>
+            </TabItem>
+
+            <TabItem Header="Train Network">
+                <Grid Background="#FFE5E5E5"/>
+            </TabItem>
+
+        </TabControl>
+    </Grid>
+</Window>

@@ -9,6 +9,7 @@ namespace NeuralNetworkLib
     /// <summary>
     /// Stores a normal and derivative version of function
     /// </summary>
+    [Serializable]
     public class Function<TArg, TRes>
     {
 
@@ -35,6 +36,7 @@ namespace NeuralNetworkLib
     /// <summary>
     /// Stores a normal and derivative version of function
     /// </summary>
+    [Serializable]
     public class Function<TArg, TArg2, TRes>
     {
 

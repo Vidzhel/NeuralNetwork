@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Runtime.Serialization.Formatters.Binary;
 
 namespace NeuralNetworkLib
 {
+    [Serializable]
     public class NeuralNetwork
     {
         #region pyblic Members
@@ -64,13 +67,13 @@ namespace NeuralNetworkLib
         /// <returns></returns>
         public double Train(double[][] trainingInputs, double[][] expectedTrainingOutputs, float learningRate, int generations, int miniBatchSize, double[][] testingInputs = null, double[][] expectedTestingOutputs = null)
         {
-            long trainingDataCount = trainingInputs.Length;
+            int trainingDataCount = trainingInputs.Length;
 
             Random rnd = new Random(miniBatchSize + generations);
             int[] trainingDataOrder = new int[trainingDataCount];
             trainingDataOrder = trainingDataOrder.Select((x, index) => index).ToArray();
 
-            long miniBatchCount = (long)Math.Ceiling((double)trainingDataCount / miniBatchSize);
+            int miniBatchCount = (int)Math.Ceiling((double)trainingDataCount / miniBatchSize);
 
             for (int gen = 0; gen < generations; gen++)
             {
@@ -79,11 +82,11 @@ namespace NeuralNetworkLib
 
 
                 // Process each train data in a batch and update neuron's weights and biases
-                for (long miniBatch = 0; miniBatch < miniBatchCount; miniBatch++)
+                for (int miniBatch = 0; miniBatch < miniBatchCount; miniBatch++)
                 {
                     for (int training = 0; training < miniBatchSize; training++)
                     {
-                        long trainingSample = training + miniBatch * miniBatchSize;
+                        int trainingSample = training + miniBatch * miniBatchSize;
                         if (trainingSample >= trainingDataCount)
                             break;
 
@@ -101,32 +104,43 @@ namespace NeuralNetworkLib
 
 
                 if (testingInputs != null && expectedTestingOutputs != null)
-                    Console.WriteLine( $"Generation {gen + 1}: accuracy {GetAccuracy(testingInputs, expectedTestingOutputs, 0.01)}" );
+                    Console.WriteLine($"Generation {gen + 1}: accuracy {GetAccuracy(testingInputs, expectedTestingOutputs, 0.01)}");
                 else
-                    Console.WriteLine( $"Generation {gen + 1}" );
+                    Console.WriteLine($"Generation {gen + 1}");
             }
 
             return GetAccuracy(testingInputs, expectedTestingOutputs, 0.01);
         }
 
-        public double[] Evaluate(double[] inputs)
+        public double[] Evaluate(double[] input)
         {
             checkLayers();
 
-            if (inputs.Length != Layers[0].InputsCount)
+            if (input.Length != Layers[0].InputsCount)
                 throw new Exception("Count of given inputs doesn't match the imput layer inputs count");
 
             foreach (var layer in Layers)
-                inputs = layer.FeedForward(inputs);
+                input = layer.FeedForward(input);
 
-            return inputs;
+            return input;
+        }
+
+        public double[][] Evaluate(double[][] inputs)
+        {
+
+            double[][] outputs = new double[inputs.Length][];
+
+            for (int input = 0; input < inputs.Length; input++)
+                outputs[input] = Evaluate(inputs[input]);
+
+            return outputs;
         }
 
         public double GetAccuracy(double[][] inputs, double[][] expectedOutputs, double tolerance = 0.5)
         {
-            long loops = inputs.GetLength(0);
-            long inputsCount = inputs[0].Length;
-            long outputsCount = expectedOutputs[0].Length;
+            int loops = inputs.GetLength(0);
+            int inputsCount = inputs[0].Length;
+            int outputsCount = expectedOutputs[0].Length;
 
             if (inputsCount != Layers[0].InputsCount)
                 throw new Exception("Count of given inputs doesn't match the imput layer inputs count");
@@ -140,16 +154,38 @@ namespace NeuralNetworkLib
             double accuracy = 0;
             double accuracyStep = 100.0 / (outputsCount * loops);
 
-            for (long i = 0; i < loops; i++)
+            for (int i = 0; i < loops; i++)
             {
                 double[] actualOutputs = Evaluate(inputs[i]);
 
-                for (long output = 0; output < outputsCount; output++)
+                for (int output = 0; output < outputsCount; output++)
                     if (Math.Abs(actualOutputs[output] - expectedOutputs[i][output]) < tolerance)
                         accuracy += accuracyStep;
             }
 
             return accuracy;
+        }
+
+        public void Save(string filePath)
+        {
+            using (FileStream stream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
+            {
+                BinaryFormatter formatter = new BinaryFormatter();
+                formatter.Serialize(stream, this);
+            }
+        }
+
+        /// <exception cref="FileNotFoundException">Will be throwen if the file doesn't exist</exception>
+        /// <exception cref="System.Runtime.Serialization.SerializationException">Will be throwen if the file data corrupted</exception>
+        /// <returns></returns>
+        public static NeuralNetwork Load(string filePath)
+        {
+
+            using (FileStream stream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+            {
+                BinaryFormatter formatter = new BinaryFormatter();
+                return (NeuralNetwork)formatter.Deserialize(stream);
+            }
         }
 
         public override string ToString()
@@ -221,7 +257,7 @@ namespace NeuralNetworkLib
 
             double cost = 0;
 
-            for (long i = 0; i < expectedRes.Length; i++)
+            for (int i = 0; i < expectedRes.Length; i++)
             {
                 cost += CostFunction.Func(actualRes[i], expectedRes[i]);
             }
@@ -233,7 +269,7 @@ namespace NeuralNetworkLib
         {
             double[] errors = calculateCostGradient(expectedRes, actualRes);
             double[] deltas = Layers.Last().BackPropagation(errors, learningRate);
-            
+
             for (int layer = Layers.Count - 2; layer > -1; layer--)
             {
                 double[][] previousLayerWeights = Layers[layer + 1].Weights;
@@ -245,7 +281,7 @@ namespace NeuralNetworkLib
         {
             double[] gradient = new double[expectedRes.Length];
 
-            for (long i = 0; i < expectedRes.Length; i++)
+            for (int i = 0; i < expectedRes.Length; i++)
                 gradient[i] = CostFunction.DerivativeFunc(expectedRes[i], actualRes[i]);
 
             return gradient;

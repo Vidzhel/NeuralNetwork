@@ -3,6 +3,7 @@ using System.Linq;
 
 namespace NeuralNetworkLib
 {
+    [Serializable]
     public class Neuron
     {
         #region public Members
@@ -17,13 +18,13 @@ namespace NeuralNetworkLib
 
         #region private Members
 
-        static long neuronsCount = 0;
+        static int neuronsCount = 0;
         Function<double, double> activationFunction;
         Random rnd;
 
         double[] weightDeltas;
         double biasDelta;
-        long backPropagationsCount = 0;
+        int backPropagationsCount = 0;
 
         #endregion
 
@@ -32,7 +33,7 @@ namespace NeuralNetworkLib
         /// <summary>
         /// Randomly fills weights and biases
         /// </summary>
-        public Neuron(long inputsCount, LayerType layerType, Function<double, double> activationFunction)
+        public Neuron(int inputsCount, LayerType layerType, Function<double, double> activationFunction)
         {
             Weights = new double[inputsCount];
             LayerType = layerType;
@@ -70,7 +71,7 @@ namespace NeuralNetworkLib
             LastInputs = inputs;
             double sum = 0;
 
-            for (long i = 0; i < inputs.Length; i++)
+            for (int i = 0; i < inputs.Length; i++)
                 sum += inputs[i] * Weights[i];
 
             sum += Bias;
@@ -84,7 +85,7 @@ namespace NeuralNetworkLib
         {
             double delta = calculateDelta(error);
 
-            for (long i = 0; i < LastInputs.Length; i++)
+            for (int i = 0; i < LastInputs.Length; i++)
             {
                 double weightDelta = delta * learningRate * LastInputs[i];
                 weightDeltas[i] += weightDelta;
@@ -101,7 +102,7 @@ namespace NeuralNetworkLib
         {
             backPropagationsCount = backPropagationsCount == 0 ? 1 : backPropagationsCount;
 
-            for (long i = 0; i < LastInputs.Length; i++)
+            for (int i = 0; i < LastInputs.Length; i++)
                 Weights[i] -= weightDeltas[i] / backPropagationsCount;
 
             Bias -= biasDelta / backPropagationsCount;
