@@ -1,5 +1,5 @@
-﻿using System.Windows;
-using SymbolRecognitionLib.ViewModels;
+﻿using SymbolRecognitionLib.InversionOfControl;
+using System.Windows;
 
 namespace SymbolsRecognition
 {
@@ -12,7 +12,7 @@ namespace SymbolsRecognition
         public MainWindow()
         {
             InitializeComponent();
-            DataContext = new AppViewModel();
+            DataContext = ApplicationService.GetAppViewModel;
         }
     }
 }

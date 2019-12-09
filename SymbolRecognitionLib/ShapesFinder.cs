@@ -346,10 +346,12 @@ namespace SymbolRecognitionLib
                 Column = 0;
                 Row++;
 
-                if (Row >= originalBitmap.Height)
+                // Delete outline
+                if (Row >= originalBitmap.Height - 2)
                     return false;
             }
 
+            // Delete outline
             if (Column == 0)
                 Column = 2;
 

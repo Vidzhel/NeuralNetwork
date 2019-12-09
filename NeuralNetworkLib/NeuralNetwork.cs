@@ -57,15 +57,20 @@ namespace NeuralNetworkLib
         #region public methods
 
         /// <summary>
-        /// Usses back propagation algorythm to change weigts and biases
+        /// Uses back propagation algorythm to change weigts and biases.
+        /// Each iteration returns monitor data in the array with the size of 5, where values can be null in the case the monitor
+        /// flags are set to false. Monitor data in the array follows the next order: generation, trainingDataCost, trainingDataAccuracy, testingDataCost, testingDataAccuracy
         /// </summary>
         /// <param name="learningRate">the speed of learning</param>
         /// <param name="generations">generations count (loops over trainingData)</param>
         /// <param name="miniBatchSize">size of chunks into with the testing data will be split</param>
         /// <param name="testingInputs">if specified will be used to calculate accuracy after each generation</param>
         /// <param name="expectedTestingOutputs">if specified will be used to calculate accuracy after each generation</param>
-        /// <returns></returns>
-        public double Train(double[][] trainingInputs, double[][] expectedTrainingOutputs, float learningRate, int generations, int miniBatchSize, double[][] testingInputs = null, double[][] expectedTestingOutputs = null)
+        /// <param name="regularizationFactor">controls the growth of the weights, the bigger factor, the closer weights will be to zero</param>
+        /// <returns>Each iteration returns monitor data in the array with the size of 5, where values can be null in the case the monitor
+        /// flags are set to false. Monitor data in the array follows the next order: generation, trainingDataCost, trainingDataAccuracy, testingDataCost, testingDataAccuracy</returns>
+        public IEnumerable<Dictionary<string, double>> Train(double[][] trainingInputs, double[][] expectedTrainingOutputs, float learningRate, int generations, int miniBatchSize, double[][] testingInputs = null, double[][] expectedTestingOutputs = null, double regularizationFactor = 0.0,
+            bool monitorTrainingDataCost = false, bool monitorTrainingDataAccuracy = false, bool monitorTestingDataCost = false, bool monitorTestingDataAccuracy = false, double accuracyTolerance = 0.01)
         {
             int trainingDataCount = trainingInputs.Length;
 
@@ -95,21 +100,29 @@ namespace NeuralNetworkLib
 
                         double[] actualOutputs = Evaluate(inputs);
 
-                        backPropagation(expectedOutputs, actualOutputs, learningRate);
+                        backPropagation(expectedOutputs, actualOutputs);
 
                     }
 
-                    updateWeights();
+                    updateWeights(learningRate, regularizationFactor, trainingDataCount);
                 }
 
+                Dictionary<string, double> monitorData = new Dictionary<string, double>();
 
-                if (testingInputs != null && expectedTestingOutputs != null)
-                    Console.WriteLine($"Generation {gen + 1}: accuracy {GetAccuracy(testingInputs, expectedTestingOutputs, 0.01)}");
-                else
-                    Console.WriteLine($"Generation {gen + 1}");
+                monitorData["generation"] = gen;
+
+                if (monitorTrainingDataCost)
+                    monitorData["trainingDataCost"] = GetCost(trainingInputs, expectedTrainingOutputs);
+                if (monitorTrainingDataAccuracy)
+                    monitorData["trainingDataAccuracy"] = GetAccuracy(trainingInputs, expectedTrainingOutputs, accuracyTolerance);
+                if (monitorTestingDataCost && testingInputs != null && expectedTestingOutputs != null)
+                    monitorData["testingDataCost"] = GetCost(testingInputs, expectedTestingOutputs);
+                if (monitorTestingDataAccuracy && testingInputs != null && expectedTestingOutputs != null)
+                    monitorData["testingDataAccuracy"] = GetAccuracy(testingInputs, expectedTestingOutputs, accuracyTolerance);
+
+                yield return monitorData;
             }
 
-            return GetAccuracy(testingInputs, expectedTestingOutputs, 0.01);
         }
 
         public double[] Evaluate(double[] input)
@@ -164,6 +177,32 @@ namespace NeuralNetworkLib
             }
 
             return accuracy;
+        }
+
+        public double GetCost(double[][] inputs, double[][] expectedOutputs)
+        {
+            int loops = inputs.GetLength(0);
+            int inputsCount = inputs[0].Length;
+            int outputsCount = expectedOutputs[0].Length;
+
+            if (inputsCount != Layers[0].InputsCount)
+                throw new Exception("Count of given inputs doesn't match the imput layer inputs count");
+
+            if (outputsCount != Layers.Last().OutputsCount)
+                throw new Exception("Count of given expected outputs doesn't match the output layer outputs count");
+
+            if (loops != expectedOutputs.GetLength(0))
+                throw new Exception("The size of inputs and expected outputs doesn't match");
+
+            double totalCost = 0;
+
+            for (int i = 0; i < loops; i++)
+            {
+                double[] actualOutputs = Evaluate(inputs[i]);
+                totalCost += calculateCost(expectedOutputs[i], actualOutputs);
+            }
+
+            return totalCost / loops;
         }
 
         public void Save(string filePath)
@@ -259,21 +298,21 @@ namespace NeuralNetworkLib
 
             for (int i = 0; i < expectedRes.Length; i++)
             {
-                cost += CostFunction.Func(actualRes[i], expectedRes[i]);
+                cost += CostFunction.Func(expectedRes[i], actualRes[i]);
             }
 
             return cost;
         }
 
-        void backPropagation(double[] expectedRes, double[] actualRes, double learningRate)
+        void backPropagation(double[] expectedRes, double[] actualRes)
         {
             double[] errors = calculateCostGradient(expectedRes, actualRes);
-            double[] deltas = Layers.Last().BackPropagation(errors, learningRate);
+            double[] deltas = Layers.Last().BackPropagation(errors);
 
             for (int layer = Layers.Count - 2; layer > -1; layer--)
             {
                 double[][] previousLayerWeights = Layers[layer + 1].Weights;
-                deltas = Layers[layer].BackPropagation(deltas, previousLayerWeights, learningRate);
+                deltas = Layers[layer].BackPropagation(deltas, previousLayerWeights);
             }
         }
 
@@ -287,10 +326,10 @@ namespace NeuralNetworkLib
             return gradient;
         }
 
-        void updateWeights()
+        void updateWeights(double learningRate, double regularizationFactor, double trainingDatasetSize)
         {
             foreach (var layer in Layers)
-                layer.UpdateDerivatives();
+                layer.UpdateDerivatives(learningRate, regularizationFactor, trainingDatasetSize);
         }
 
         #endregion

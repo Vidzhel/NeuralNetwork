@@ -55,7 +55,7 @@ namespace NeuralNetworkLib
             return outputs;
         }
 
-        public double[] BackPropagation(double[] errors, double learningRate)
+        public double[] BackPropagation(double[] errors)
         {
             if (OutputsCount != errors.Length)
                 throw new ArgumentException("Errors vector doesn't match the layer neurons count");
@@ -63,12 +63,12 @@ namespace NeuralNetworkLib
             double[] deltas = new double[errors.Length];
 
             for (int i = 0; i < Neurons.Length; i++)
-                deltas[i] = Neurons[i].BackPropagation(errors[i], learningRate);
+                deltas[i] = Neurons[i].BackPropagation(errors[i]);
 
             return deltas;
         }
 
-        public double[] BackPropagation(double[] nextLayerDeltas, double[][] nextLayerWeights, double learningRate)
+        public double[] BackPropagation(double[] nextLayerDeltas, double[][] nextLayerWeights)
         {
             if (Type == LayerType.InputLayer)
                 return nextLayerDeltas;
@@ -80,18 +80,18 @@ namespace NeuralNetworkLib
             double[] thisLaterDeltas = new double[thisLayerErrors.Length];
 
             for (int i = 0; i < Neurons.Length; i++)
-                thisLaterDeltas[i] = Neurons[i].BackPropagation(thisLayerErrors[i], learningRate);
+                thisLaterDeltas[i] = Neurons[i].BackPropagation(thisLayerErrors[i]);
 
             return thisLaterDeltas;
         }
 
-        public void UpdateDerivatives()
+        public void UpdateDerivatives(double learningRate, double regularizationFactor, double trainingDatasetSize)
         {
             if (Type == LayerType.InputLayer)
                 return;
 
             foreach (var neuron in Neurons)
-                neuron.UpdateDerivatives();
+                neuron.UpdateDerivatives(learningRate, regularizationFactor, trainingDatasetSize);
         }
 
         public override string ToString()

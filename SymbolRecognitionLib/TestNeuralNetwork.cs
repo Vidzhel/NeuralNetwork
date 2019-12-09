@@ -12,7 +12,7 @@ namespace SymbolsRecognitionLib
     {
         public static void Test()
         {
-            NeuralNetwork network = new NeuralNetwork(new int[] { 784, 30, 10 }, Function<double, double, double>.MeanSquareCost, Function<double, double>.SigmoidFunction);
+            //NeuralNetwork network = new NeuralNetwork(new int[] { 784, 30, 10 }, Function<double, double, double>.MeanSquareCost, Function<double, double>.SigmoidFunction);
 
             double[][] trainingImages;
             double[][] testingImages;
@@ -22,17 +22,18 @@ namespace SymbolsRecognitionLib
 
             MNISTDataLoader.PrepeareData("..//..//..//MNISTDataset", out trainingImages, out testingImages, out trainingLables, out testingLabels);
 
-            network.Train(trainingImages, trainingLables, learningRate: 3F, generations: 15, miniBatchSize: 10, testingImages, testingLabels);
-            Console.WriteLine(network.GetAccuracy(testingImages, testingLabels));
+            //foreach (var monitorData in network.Train(trainingImages, trainingLables, learningRate: 0.5F, generations: 30, miniBatchSize: 10, testingImages, testingLabels, 5.0, true, true, true, true, 0.3))
+            //{
+            //    Console.WriteLine($"Gen {monitorData[0]} TrainingData: Accuracy: {monitorData[2]} Cost: {monitorData[1]}; TestData: Accuracy: {monitorData[4]} Cost: {monitorData[3]};");
+            //}
+            //Console.WriteLine("Saveing network");
+            //network.Save("network.net");
 
-            Console.WriteLine("Saveing network");
-            network.Save("network.net");
-            
             Console.WriteLine("Opening network");
-            var newNetwork = NeuralNetwork.Load("network.net");
+            var newNetwork = NeuralNetwork.Load("symbolsRecognitionNetwork.net");
             
             Console.WriteLine("Testing network");
-            Console.WriteLine(newNetwork.GetAccuracy(testingImages, testingLabels));
+            Console.WriteLine(newNetwork.GetAccuracy(testingImages, testingLabels, 0.3));
 
             Console.WriteLine("Done");
         }

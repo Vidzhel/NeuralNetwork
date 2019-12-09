@@ -41,7 +41,7 @@ namespace NeuralNetworkLib
     {
 
         static public Function<double, double, double> MeanSquareCost = new Function<double, double, double>("Mean square cost function", (expected, actual) => Math.Pow(actual - expected, 2)/2.0, (expected, actual) => actual - expected);
-        static public Function<double, double, double> CrossEntropy = new Function<double, double, double>("Cross entropy cost function", (expected, actual) => -expected*Math.Log10(actual) + (1 + expected)*Math.Log10(1 - actual), (expected, actual) => expected/actual - (1 - expected)/(1 - actual));
+        static public Function<double, double, double> CrossEntropy = new Function<double, double, double>("Cross entropy cost function", (expected, actual) => -expected*Math.Log10(actual) - (1 - expected)*Math.Log10(1 - actual), (expected, actual) => -expected/actual + (1 - expected)/(1 - actual));
 
         public string Name { get; }
         public Func<TArg, TArg2, TRes> Func { get; }

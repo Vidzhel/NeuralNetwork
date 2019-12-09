@@ -41,11 +41,11 @@ namespace NeuralNetworkLib
             weightDeltas = new double[Weights.Length];
 
             neuronsCount++;
-            rnd = new Random((int)neuronsCount);
+            rnd = new Random(neuronsCount);
 
             Bias = rnd.NextDouble() - 0.5;
             for (int i = 0; i < inputsCount; i++)
-                Weights[i] = rnd.NextDouble() - 0.5;
+                Weights[i] = rnd.NextGaussian() / Math.Sqrt(inputsCount);
         }
 
         public Neuron(double[] weights, double bias, LayerType layerType, Function<double, double> activationFunction)
@@ -81,33 +81,34 @@ namespace NeuralNetworkLib
             return activationFunction.Func(sum);
         }
 
-        public double BackPropagation(double error, double learningRate)
+        public double BackPropagation(double error)
         {
             double delta = calculateDelta(error);
 
             for (int i = 0; i < LastInputs.Length; i++)
             {
-                double weightDelta = delta * learningRate * LastInputs[i];
+                double weightDelta = delta * LastInputs[i];
                 weightDeltas[i] += weightDelta;
             }
 
-            biasDelta += learningRate * delta;
+            biasDelta += delta;
 
             backPropagationsCount++;
 
             return delta;
         }
 
-        public void UpdateDerivatives()
+        public void UpdateDerivatives(double learningRate, double regularizationFactor, double trainingDatasetSize)
         {
             backPropagationsCount = backPropagationsCount == 0 ? 1 : backPropagationsCount;
 
             for (int i = 0; i < LastInputs.Length; i++)
-                Weights[i] -= weightDeltas[i] / backPropagationsCount;
+                //Weights[i] = Weights[i] - learningRate*weightDeltas[i]/backPropagationsCount;
+                Weights[i] = (1 - learningRate * regularizationFactor / trainingDatasetSize) * Weights[i] - learningRate * weightDeltas[i] / backPropagationsCount;
 
-            Bias -= biasDelta / backPropagationsCount;
+            Bias -= learningRate * biasDelta / backPropagationsCount;
 
-            if (Double.IsNaN(Bias))
+            if (double.IsNaN(Bias))
                 throw new Exception();
 
             // Clear deltas and counter

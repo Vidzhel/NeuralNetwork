@@ -1,4 +1,6 @@
 ﻿using NeuralNetworkLib;
+using SymbolRecognitionLib.InversionOfControl;
+using SymbolsRecognitionLib;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -45,6 +47,21 @@ namespace SymbolRecognitionLib.ViewModels
             }
         }
 
+        string expectedResults;
+        public string ExpectedResults
+        {
+            get
+            {
+                return expectedResults;
+            }
+
+            set
+            {
+                expectedResults = value;
+                OnPropertyChanged(nameof(ExpectedResults));
+            }
+        }
+
         Regex onlyNumbers = new Regex(@"^\d+$");
         int brushSize = 10;
         public string BrushSize
@@ -80,7 +97,6 @@ namespace SymbolRecognitionLib.ViewModels
             }
         }
 
-
         bool showBorderBoxes = false;
         public bool ShowBorderBoxes
         {
@@ -95,9 +111,24 @@ namespace SymbolRecognitionLib.ViewModels
             }
         }
 
+        bool classifyResults = false;
+        public bool ClassifyResults
+        {
+            get
+            {
+                return classifyResults;
+            }
 
-        NeuralNetwork neuralNetwork;
-            
+            set
+            {
+                classifyResults = value;
+                OnPropertyChanged(nameof(ClassifyResults));
+            }
+        }
+
+        List<double[][]> userTrainingData = new List<double[][]>();
+        List<double[][]> userLabledResults = new List<double[][]>();
+
         public SymbolsRecognitionViewModel()
         {
             // Init commands
@@ -106,23 +137,23 @@ namespace SymbolRecognitionLib.ViewModels
             OnCanvasLoaded = new Command(onCanvasLoaded);
 
             // Init Neural Network
-            neuralNetwork = NeuralNetwork.Load("symbolsRecognitionNetwork.net");
-
-            //double[][] trainingImages;
-            //double[][] testingImages;
+            //neuralNetwork = NeuralNetwork.Load("symbolsRecognitionNetwork.net");
+            //TestNeuralNetwork.Test();
+            //double[][] trainingInputs;
+            //double[][] testingInputs;
 
             //double[][] trainingLables;
             //double[][] testingLabels;
-            //MNISTDataLoader.PrepeareData("..//..//..//MNISTDataset", out trainingImages, out testingImages, out trainingLables, out testingLabels, 10, 10);
-            //foreach (var img in trainingImages)
+            //MNISTDataLoader.PrepeareData("..//..//..//MNISTDataset", out trainingInputs, out testingInputs, out trainingLables, out testingLabels, 10, 10);
+            //foreach (var img in trainingInputs)
             //{
-            //    MNISTDataLoader.ConvertImageToBitmap(img).DrawInConsole();
+            //    MNISTDataLoader.ConvertImageToBitmap(img).Rotate(15).DrawInConsole();
             //}
         }
 
         #region Command handlers
 
-        #region Processor
+        #region Image Processor
 
         void processUserInput(object obj)
         {
@@ -135,10 +166,14 @@ namespace SymbolRecognitionLib.ViewModels
             if (showBorderBoxes)
                 drawBorderBoxes(borderBoxes);
 
-            Bitmap[] symbols = extractSymbols(canvas, borderBoxes, 5);
+            Bitmap[] symbols = extractSymbols(canvas, borderBoxes);
+
+            if (classifyResults)
+                labelResults(symbols);
+
             double[][] inputs = convertToNeuralNetworkInputs(symbols);
 
-            double[][] outputs = neuralNetwork.Evaluate(inputs);
+            double[][] outputs = ApplicationService.GetNeuralNetwork.Evaluate(inputs);
             processOutputs(outputs);
         }
 
@@ -216,7 +251,10 @@ namespace SymbolRecognitionLib.ViewModels
             canvas.Strokes.Add(strokes);
         }
 
-        Bitmap[] extractSymbols(Bitmap sourceBmp, List<Rectangle> borderBox, int padding)
+        /// <summary>
+        /// Extracts symbols from the source bitmap and places them into the square of appropriate size
+        /// </summary>
+        Bitmap[] extractSymbols(Bitmap sourceBmp, List<Rectangle> borderBox)
         {
             System.Drawing.Imaging.PixelFormat format = sourceBmp.PixelFormat;
             System.Drawing.Image sourceImage = (System.Drawing.Image)sourceBmp.Clone();
@@ -227,7 +265,7 @@ namespace SymbolRecognitionLib.ViewModels
             {
                 var shape = borderBox[i];
 
-                var size = Math.Max(shape.Width, shape.Height) + 2 * padding;
+                var size = Math.Max(shape.Width, shape.Height);
 
                 int horizontalPadding = (size - shape.Width) / 2;
                 int verticalPadding = (size - shape.Height) / 2;
@@ -250,6 +288,80 @@ namespace SymbolRecognitionLib.ViewModels
             return symbols;
         }
 
+        void labelResults(Bitmap[] symbols, float angle = 15, int offset = 10, float scaleFactor = 2)
+        {
+            if (expectedResults.Length != symbols.Length && expectedResults.Length != 1)
+                throw new Exception();
+
+            for (int i = 0; i < symbols.Length; i++)
+            {
+                List<Bitmap> trainingData = new List<Bitmap>(42);
+                var symbol = symbols[i];
+
+                trainingData.Add(symbol);
+
+                var rotatedRight = symbol.Rotate(-angle);
+                var rotatedLeft = symbol.Rotate(angle);
+
+                trainingData.Add(rotatedRight);
+                trainingData.Add(rotatedLeft);
+
+                addDistortions(symbol, ref trainingData, offset, scaleFactor);
+                addDistortions(rotatedRight, ref trainingData, offset, scaleFactor);
+                addDistortions(rotatedLeft, ref trainingData, offset, scaleFactor);
+
+                userTrainingData.Add(convertToNeuralNetworkInputs(trainingData.ToArray()));
+            }
+
+            int[] num = new int[symbols.Length];
+            double[][] expectedOutputs;
+
+            if (expectedResults.Length == symbols.Length)
+            {
+                for (int symbol = 0; symbol < symbols.Length; symbol++)
+                    num[symbol] = int.Parse(new string(expectedResults[symbol], 1));
+
+                expectedOutputs = convertToNeuralNetworkOutput(num, 42);
+            }
+            else
+            {
+
+            }
+
+            //userLabledResults.Add(expectedOutputs);
+        }
+
+        void addDistortions(Bitmap symbol, ref List<Bitmap> storage, int offset, float scaleFactor)
+        {
+            storage.Add(symbol.Scale(scaleFactor, 1));
+            storage.Add(symbol.Scale(1, scaleFactor));
+
+            var skewHorizontalyBottom = symbol.SkewHorizontaly(offset, HorizonlSkew.Bottom);
+            var skewHorizontalyTop = symbol.SkewHorizontaly(offset, HorizonlSkew.Top);
+
+            storage.Add(skewHorizontalyBottom);
+            storage.Add(skewHorizontalyTop);
+
+            var skewVerticalyLeft = symbol.SkewVeritcaly(offset, VerticalSkew.Left);
+            var skewVerticalyRight = symbol.SkewVeritcaly(offset, VerticalSkew.Right);
+
+            storage.Add(skewVerticalyLeft);
+            storage.Add(skewVerticalyRight);
+
+
+            storage.Add(skewHorizontalyBottom.Scale(scaleFactor, 1));
+            storage.Add(skewHorizontalyBottom.Scale(1, scaleFactor));
+
+            storage.Add(skewHorizontalyTop.Scale(scaleFactor, 1));
+            storage.Add(skewHorizontalyTop.Scale(1, scaleFactor));
+
+            storage.Add(skewVerticalyLeft.Scale(scaleFactor, 1));
+            storage.Add(skewVerticalyLeft.Scale(1, scaleFactor));
+
+            storage.Add(skewVerticalyRight.Scale(scaleFactor, 1));
+            storage.Add(skewVerticalyRight.Scale(1, scaleFactor));
+        }
+
         double[][] convertToNeuralNetworkInputs(Bitmap[] symbols)
         {
 
@@ -269,10 +381,10 @@ namespace SymbolRecognitionLib.ViewModels
                         double pixelBrightness = symbol.GetPixel(col, row).GetBrightness();
 
                         // Inverse all white pixels to black
-                        // 
+                        // Convert to appropriate format (0 - white, 2.55 - black)
                         input[pixel] = pixelBrightness == 1 ? 0 : (1 - pixelBrightness) * 2.55;
                     }
-
+                
                 inputs[i] = input;
             }
 
@@ -295,6 +407,25 @@ namespace SymbolRecognitionLib.ViewModels
 
                 Output += resultNum;
             }
+        }
+        
+        double[][] convertToNeuralNetworkOutput(int[] num, int repetitions)
+        {
+            double[][] outputs = new double[num.Length * repetitions][];
+
+            for (int i = 0; i < num.Length; i++)
+            {
+                double[] output = new double[ApplicationService.GetNeuralNetwork.Layers[0].InputsCount];
+
+                output[num[i]] = 1;
+
+                for (int j = 0; j < repetitions; j++)
+                {
+                    outputs[i*repetitions + j] = output;
+                }
+            }
+
+            return outputs;
         }
         #endregion
 

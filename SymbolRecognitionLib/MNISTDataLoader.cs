@@ -11,36 +11,37 @@ namespace SymbolRecognitionLib
         public static void PrepeareData(string folderPath, out double[][] trainingImages, out double[][] testingImages, out double[][] trainLabels, out double[][] testLabels, int? testDataCount = null, int? trainDataCount = null)
         {
 
-            double[] trainingLables;
+            double[] trainingLabels;
             double[] testingLables;
 
-            LoadTrainData(folderPath, out trainingImages, out trainingLables, trainDataCount);
+            LoadTrainData(folderPath, out trainingImages, out trainingLabels, trainDataCount);
             LoadTestData(folderPath, out testingImages, out testingLables, testDataCount);
 
-            testLabels = new double[testingLables.Length][];
-            trainLabels = new double[trainingLables.Length][];
+            testLabels = ConvertLabels(testingLables);
+            trainLabels = ConvertLabels(trainingLabels);
 
-            for (int label = 0; label < testingLables.Length; label++)
+        }
+
+        public static double[][] ConvertLabels(double[] labels)
+        {
+            double[][] convertedLabels = new double[labels.Length][];
+
+            for (int label = 0; label < labels.Length; label++)
             {
                 double[] testingOutput = new double[10];
-                testingOutput[(int)testingLables[label]]++;
+                testingOutput[(int)labels[label]]++;
 
-                testLabels[label] = testingOutput;
+                convertedLabels[label] = testingOutput;
             }
 
-            for (int label = 0; label < trainingLables.Length; label++)
-            {
-                double[] trainingOutput = new double[10];
-                trainingOutput[(int)trainingLables[label]]++;
-
-                trainLabels[label] = trainingOutput;
-            }
+            return convertedLabels;
         }
+
 
         public static void LoadTestData(string folderPath, out double[][] images, out double[] labels, int? count = null)
         {
-            string testImages = folderPath + "//t10k-images-idx3-ubyte.gz";
-            string testLabels = folderPath + "/t10k-labels-idx1-ubyte.gz";
+            string testImages = folderPath + "//t10k-images-idx3-ubyte.mnist.gz";
+            string testLabels = folderPath + "/t10k-labels-idx1-ubyte.mnist.gz";
 
             images = ReadImages(testImages, count);
             labels = ReadLabels(testLabels, count);
@@ -48,8 +49,8 @@ namespace SymbolRecognitionLib
 
         public static void LoadTrainData(string folderPath, out double[][] images, out double[] labels, int? count = null)
         {
-            string testImages = folderPath + "//train-images-idx3-ubyte.gz";
-            string testLabels = folderPath + "//train-labels-idx1-ubyte.gz";
+            string testImages = folderPath + "//train-images-idx3-ubyte.mnist.gz";
+            string testLabels = folderPath + "//train-labels-idx1-ubyte.mnist.gz";
 
             images = ReadImages(testImages, count);
             labels = ReadLabels(testLabels, count);
@@ -70,9 +71,15 @@ namespace SymbolRecognitionLib
             return bmp;
         }
 
-        public static double[][] ReadImages(string filePath, int? count)
+        public static double[][] ReadImages(string filePath, int? count = null)
         {
-            var fileStream = decompress(new FileInfo(filePath));
+            Stream fileStream;
+
+            if (Path.GetExtension(filePath) == ".gz")
+                fileStream = Decompress(new FileInfo(filePath));
+            else
+                fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+
             double[][] images;
 
             try
@@ -110,9 +117,15 @@ namespace SymbolRecognitionLib
             }
         }
 
-        public static double[] ReadLabels(string filePath, int? count)
+        public static double[] ReadLabels(string filePath, int? count = null)
         {
-            var fileStream = decompress(new FileInfo(filePath));
+            Stream fileStream;
+
+            if (Path.GetExtension(filePath) == ".gz")
+                fileStream = Decompress(new FileInfo(filePath));
+            else
+                fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+
             double[] labels;
 
             try
@@ -142,7 +155,7 @@ namespace SymbolRecognitionLib
             }
         }
 
-        static MemoryStream decompress(FileInfo fileToDecompress)
+        public static MemoryStream Decompress(FileInfo fileToDecompress)
         {
             using (FileStream originalFileStream = fileToDecompress.OpenRead())
             {
