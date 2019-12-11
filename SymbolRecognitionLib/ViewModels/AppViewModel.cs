@@ -204,6 +204,7 @@ namespace SymbolRecognitionLib.ViewModels
 
             IsNetworkLoaded = true;
             LoadedNetworkName = "new_nn.net";
+            NeuralNetworkTypology = "";
         }
         #endregion
 

@@ -71,71 +71,37 @@ namespace SymbolRecognitionLib.ViewModels
         Regex onlyIntegers = new Regex(@"^\d+$");
         Regex onlyNumbers = new Regex(@"^\d+(?:\,\d+)?$");
 
-        private int? trainingInputsCount = 0;
-        public string TrainingInputsCount
+        private int? trainingDataCount = 0;
+        public string TrainingDataCount
         {
-            get { return trainingInputsCount == null? "All": trainingInputsCount.ToString(); }
+            get { return trainingDataCount == null? "All": trainingDataCount.ToString(); }
             set
             {
                 if (string.Equals(value, "All", StringComparison.CurrentCultureIgnoreCase))
-                    trainingInputsCount = null;
+                    trainingDataCount = null;
                 else if (onlyIntegers.IsMatch(value))
-                    trainingInputsCount = int.Parse(value);
+                    trainingDataCount = int.Parse(value);
                 else
-                    trainingInputsCount = 0;
+                    trainingDataCount = 0;
 
-                OnPropertyChanged(nameof(TrainingInputsCount));
+                OnPropertyChanged(nameof(TrainingDataCount));
             }
         }
 
-        private int? trainingLablesCount = 0;
-        public string TrainingLablesCount
+        private int? testingDataCount = 0;
+        public string TestingDataCount
         {
-            get { return trainingLablesCount == null ? "All" : trainingLablesCount.ToString(); }
+            get { return testingDataCount == null ? "All" : testingDataCount.ToString(); }
             set
             {
                 if (string.Equals(value, "All", StringComparison.CurrentCultureIgnoreCase))
-                    trainingLablesCount = null;
+                    testingDataCount = null;
                 else if (onlyIntegers.IsMatch(value))
-                    trainingLablesCount = int.Parse(value);
+                    testingDataCount = int.Parse(value);
                 else
-                    trainingLablesCount = 0;
+                    testingDataCount = 0;
 
-                OnPropertyChanged(nameof(TrainingLablesCount));
-            }
-        }
-
-        private int? testingInputsCount = 0;
-        public string TestingInputsCount
-        {
-            get { return testingInputsCount == null ? "All" : testingInputsCount.ToString(); }
-            set
-            {
-                if (string.Equals(value, "All", StringComparison.CurrentCultureIgnoreCase))
-                    testingInputsCount = null;
-                else if (onlyIntegers.IsMatch(value))
-                    testingInputsCount = int.Parse(value);
-                else
-                    testingInputsCount = 0;
-
-                OnPropertyChanged(nameof(TestingInputsCount));
-            }
-        }
-
-        private int? testingLablesCount = 0;
-        public string TestingLablesCount
-        {
-            get { return testingLablesCount == null ? "All" : testingLablesCount.ToString(); }
-            set
-            {
-                if (string.Equals(value, "All", StringComparison.CurrentCultureIgnoreCase))
-                    testingLablesCount = null;
-                else if (onlyIntegers.IsMatch(value))
-                    testingLablesCount = int.Parse(value);
-                else
-                    testingLablesCount = 0;
-
-                OnPropertyChanged(nameof(TestingLablesCount));
+                OnPropertyChanged(nameof(TestingDataCount));
             }
         }
 
@@ -165,6 +131,7 @@ namespace SymbolRecognitionLib.ViewModels
                 else
                     generations = 0;
 
+                updateGraph();
                 OnPropertyChanged(nameof(Generations));
             }
         }
@@ -344,6 +311,12 @@ namespace SymbolRecognitionLib.ViewModels
         double[][] testingInputs;
         double[][] testingLabels;
 
+        string trainingInputsFilePath;
+        string trainingLabelsFilePath;
+
+        string testingInputsFilePath;
+        string testingLabelsFilePath;
+        
         int trainingsInRow;
 
         public TrainNetworkViewModel()
@@ -354,10 +327,10 @@ namespace SymbolRecognitionLib.ViewModels
 
         void initCommands()
         {
-            LoadTrainingInputs = new Command(loadTrainingInputs);
-            LoadTrainingLabels = new Command(loadTrainingLabels);
-            LoadTestingInputs = new Command(loadTestingInputs);
-            LoadTestingLabels = new Command(loadTestingLabels);
+            LoadTrainingInputs = new Command(chooseTrainingInputs);
+            LoadTrainingLabels = new Command(chooseTrainingLabels);
+            LoadTestingInputs = new Command(chooseTestingInputs);
+            LoadTestingLabels = new Command(chooseTestingLabel);
 
             Train = new Command(train);
             ClearGraphs = new Command(clearGraphs);
@@ -367,86 +340,140 @@ namespace SymbolRecognitionLib.ViewModels
 
         #region Load Data
 
-        void loadTrainingInputs(object obj)
+        void chooseTrainingInputs(object obj)
         {
             string filePath = FileManager.OpenFileDialog("Mnist Dataset (*.mnist*)|*.mnist*|User Dataset (*.ninp)|*.ninp*", @"C:\work\C#\Neural Network\NeuralNetwork");
 
             if (string.IsNullOrEmpty(filePath))
                 return;
 
-            if (filePath.Contains(".mnist"))
-                trainingInputs = MNISTDataLoader.ReadImages(filePath, trainingInputsCount);
-            else
-            {
-                if (Path.GetExtension(filePath) == ".gz")
-                    trainingInputs = resizeData((double[][])diserealize(MNISTDataLoader.Decompress(new FileInfo(filePath))), trainingInputsCount);
-                else
-                    trainingInputs = resizeData((double[][])diserealize(filePath), trainingInputsCount);
-            }
-
+            trainingInputsFilePath = filePath;
             TrainingInputsFileName = Path.GetFileName(filePath);
             tryActivateTrain();
         }
 
-        void loadTrainingLabels(object obj)
+        void chooseTrainingLabels(object obj)
         {
             string filePath = FileManager.OpenFileDialog("Mnist Dataset (*.mnist*)|*.mnist*|User Dataset (*.nlabl)|*.nlabl*", @"C:\work\C#\Neural Network\NeuralNetwork");
 
             if (string.IsNullOrEmpty(filePath))
                 return;
 
-            if (filePath.Contains(".mnist"))
-                trainingLabels = MNISTDataLoader.ConvertLabels(MNISTDataLoader.ReadLabels(filePath, trainingLablesCount));
-            else
-            {
-                if (Path.GetExtension(filePath) == ".gz")
-                    trainingLabels = resizeData((double[][])diserealize(MNISTDataLoader.Decompress(new FileInfo(filePath))), trainingLablesCount);
-                else
-                    trainingLabels = resizeData((double[][])diserealize(filePath), trainingLablesCount);
-            }
-
+            trainingLabelsFilePath = filePath;
             TrainingLabelsFileName = Path.GetFileName(filePath);
             tryActivateTrain();
         }
 
-        void loadTestingInputs(object obj)
+        void chooseTestingInputs(object obj)
         {
             string filePath = FileManager.OpenFileDialog("Mnist Dataset (*.mnist*)|*.mnist*|User Dataset (*.ninp*)|*.ninp*", @"C:\work\C#\Neural Network\NeuralNetwork");
 
             if (string.IsNullOrEmpty(filePath))
                 return;
 
-            if (filePath.Contains(".mnist"))
-                testingInputs = MNISTDataLoader.ReadImages(filePath, testingInputsCount);
-            else
-            {
-                if (Path.GetExtension(filePath) == ".gz")
-                    testingInputs = resizeData((double[][])diserealize(MNISTDataLoader.Decompress(new FileInfo(filePath))), testingInputsCount);
-                else
-                    testingInputs = resizeData((double[][])diserealize(filePath), testingInputsCount);
-            }
-
+            testingInputsFilePath = filePath;
             TestingInputsFileName = Path.GetFileName(filePath);
         }
 
-        void loadTestingLabels(object obj)
+
+        void chooseTestingLabel(object obj)
         {
-            string filePath = FileManager.OpenFileDialog("Mnist Dataset (*.mnist*)|*.mnist*|User Dataset (*.nlabl)|*.nlabl*", @"C:\work\C#\Neural Network\NeuralNetwork");
+            string filePath = FileManager.OpenFileDialog("Mnist Dataset (*.mnist*)|*.mnist*|User Dataset (*.ninp*)|*.ninp*", @"C:\work\C#\Neural Network\NeuralNetwork");
 
             if (string.IsNullOrEmpty(filePath))
                 return;
 
-            if (filePath.Contains(".mnist"))
-                testingLabels = MNISTDataLoader.ConvertLabels(MNISTDataLoader.ReadLabels(filePath, trainingLablesCount));
-            else
+            testingLabelsFilePath = filePath;
+            TestingLabelsFileName = Path.GetFileName(filePath);
+        }
+
+        void loadData()
+        {
+            loadTrainingInputs();
+            loadTrainingLabels();
+            loadTestingInputs();
+            loadTestingLabels();
+        }
+
+        void loadTrainingInputs()
+        {
+            if (string.IsNullOrEmpty(trainingInputsFilePath) || trainingDataCount == 0)
             {
-                if (Path.GetExtension(filePath) == ".gz")
-                    testingLabels = resizeData((double[][])diserealize(MNISTDataLoader.Decompress(new FileInfo(filePath))), trainingLablesCount);
-                else
-                    testingLabels = resizeData((double[][])diserealize(filePath), trainingLablesCount);
+                trainingInputs = null;
+                return;
             }
 
-            TestingLabelsFileName = Path.GetFileName(filePath);
+            if (trainingInputsFilePath.Contains(".mnist"))
+                trainingInputs = MNISTDataLoader.ReadImages(trainingInputsFilePath, trainingDataCount);
+            else
+            {
+                if (Path.GetExtension(trainingInputsFilePath) == ".gz")
+                    trainingInputs = resizeData((double[][])diserealize(MNISTDataLoader.Decompress(new FileInfo(trainingInputsFilePath))), trainingDataCount);
+                else
+                    trainingInputs = resizeData((double[][])diserealize(trainingInputsFilePath), trainingDataCount);
+            }
+
+        }
+
+        void loadTrainingLabels()
+        {
+
+            if (string.IsNullOrEmpty(trainingLabelsFilePath) || trainingDataCount == 0)
+            {
+                trainingLabels = null;
+                return;
+            }
+
+
+            if (trainingLabelsFilePath.Contains(".mnist"))
+                trainingLabels = MNISTDataLoader.ConvertLabels(MNISTDataLoader.ReadLabels(trainingLabelsFilePath, trainingDataCount));
+            else
+            {
+                if (Path.GetExtension(trainingLabelsFilePath) == ".gz")
+                    trainingLabels = resizeData((double[][])diserealize(MNISTDataLoader.Decompress(new FileInfo(trainingLabelsFilePath))), trainingDataCount);
+                else
+                    trainingLabels = resizeData((double[][])diserealize(trainingLabelsFilePath), trainingDataCount);
+            }
+        }
+
+        void loadTestingInputs()
+        {
+
+            if (string.IsNullOrEmpty(testingInputsFilePath) || testingDataCount == 0)
+            {
+                testingInputs = null;
+                return;
+            }
+
+            if (testingInputsFilePath.Contains(".mnist"))
+                testingInputs = MNISTDataLoader.ReadImages(testingInputsFilePath, testingDataCount);
+            else
+            {
+                if (Path.GetExtension(testingInputsFilePath) == ".gz")
+                    testingInputs = resizeData((double[][])diserealize(MNISTDataLoader.Decompress(new FileInfo(testingInputsFilePath))), testingDataCount);
+                else
+                    testingInputs = resizeData((double[][])diserealize(testingInputsFilePath), testingDataCount);
+            }
+        }
+
+        void loadTestingLabels()
+        {
+            if (string.IsNullOrEmpty(testingLabelsFilePath) || testingDataCount == 0)
+            {
+                testingLabels = null;
+                return;
+            }
+
+            if (testingLabelsFilePath.Contains(".mnist"))
+                testingLabels = MNISTDataLoader.ConvertLabels(MNISTDataLoader.ReadLabels(testingLabelsFilePath, testingDataCount));
+            else
+            {
+                if (Path.GetExtension(testingLabelsFilePath) == ".gz")
+                    testingLabels = resizeData((double[][])diserealize(MNISTDataLoader.Decompress(new FileInfo(testingLabelsFilePath))), testingDataCount);
+                else
+                    testingLabels = resizeData((double[][])diserealize(testingLabelsFilePath), testingDataCount);
+            }
+
         }
 
         object diserealize(string filePath)
@@ -492,7 +519,7 @@ namespace SymbolRecognitionLib.ViewModels
 
         void tryActivateTrain()
         {
-            if (trainingInputs != null && trainingLabels != null)
+            if (!string.IsNullOrEmpty(trainingInputsFilePath) && string.IsNullOrEmpty(trainingLabelsFilePath))
                 TrainActive = true;
         }
 
@@ -500,7 +527,9 @@ namespace SymbolRecognitionLib.ViewModels
         {
             IsTrainingInTheProcess = true;
             trainingsInRow++;
+            loadData();
             addSeries();
+            cheickLoadedData();
 
             try
             {
@@ -512,6 +541,19 @@ namespace SymbolRecognitionLib.ViewModels
                 IsTrainingInTheProcess = false;
             }
         }
+        void cheickLoadedData()
+        {
+            if (testingInputs == null || testingLabels == null)
+            {
+                testingInputs = null;
+                testingLabels = null;
+
+                MonitorTestingAccuracy = false;
+                MonitorTestingCost = false;
+            }
+        }
+
+        #region Graph related methods
 
         void initGraphs()
         {
@@ -535,10 +577,28 @@ namespace SymbolRecognitionLib.ViewModels
             OnPropertyChanged(nameof(TrainingDataCost));
             OnPropertyChanged(nameof(TestingDataAccuracy));
             OnPropertyChanged(nameof(TestingDataCost));
+
+            trainingDataAccuracy.InvalidatePlot(true);
+        }
+
+        void updateGraph()
+        {
+            initAxes(trainingDataAccuracy, "Accuracy");
+            initAxes(trainingDataCost, "Cost");
+            initAxes(testingDataAccuracy, "Accuracy");
+            initAxes(testingDataCost, "Cost");
+
+            trainingDataAccuracy.InvalidatePlot(true);
+            trainingDataCost.InvalidatePlot(true);
+            testingDataAccuracy.InvalidatePlot(true);
+            testingDataCost.InvalidatePlot(true);
         }
 
         void initAxes(PlotModel plotModel, string leftAxisTitle)
         {
+            for (int i = 0; i < plotModel.Axes.Count; i++)
+                plotModel.Axes.RemoveAt(0);
+
             var bottomAxis = new LinearAxis();
             bottomAxis.Title = "Generation";
             bottomAxis.Position = AxisPosition.Bottom;
@@ -578,7 +638,7 @@ namespace SymbolRecognitionLib.ViewModels
             trainingDataAccuracy.Series.Add(trainingDataAccuracySeries);
             trainingDataCost.Series.Add(trainingDataCostSeries);
             testingDataAccuracy.Series.Add(testingDataAccuracySeries);
-            trainingDataCost.Series.Add(testingDataCostSeries);
+            testingDataCost.Series.Add(testingDataCostSeries);
         }
 
         void populateGraphsWithData(Dictionary<string, double> monitorData)
@@ -591,7 +651,8 @@ namespace SymbolRecognitionLib.ViewModels
                 LineSeries series = (LineSeries)trainingDataAccuracy.Series[trainingIndex];
 
                 series.Points.Add(new DataPoint(x, monitorData["trainingDataAccuracy"]));
-                OnPropertyChanged(nameof(TrainingDataAccuracy));
+                //OnPropertyChanged(nameof(TrainingDataAccuracy));
+                trainingDataAccuracy.InvalidatePlot(true);
             }
             if (monitorTrainingCost)
             {
@@ -599,21 +660,26 @@ namespace SymbolRecognitionLib.ViewModels
 
                 series.Points.Add(new DataPoint(x, monitorData["trainingDataCost"]));
                 OnPropertyChanged(nameof(TrainingDataCost));
+                trainingDataCost.InvalidatePlot(true);
             }
             if (monitorTestingAccuracy)
             {
                 LineSeries series = (LineSeries)testingDataAccuracy.Series[trainingIndex];
 
                 series.Points.Add(new DataPoint(x, monitorData["testingDataAccuracy"]));
+                testingDataAccuracy.InvalidatePlot(true);
             }
             if (monitorTestingCost)
             {
                 LineSeries series = (LineSeries)testingDataCost.Series[trainingIndex];
 
                 series.Points.Add(new DataPoint(x, monitorData["testingDataCost"]));
+                testingDataCost.InvalidatePlot(true);
             }
 
         }
+        
+        #endregion
 
         #endregion
     }

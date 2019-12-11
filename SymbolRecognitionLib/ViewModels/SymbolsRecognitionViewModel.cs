@@ -127,7 +127,7 @@ namespace SymbolRecognitionLib.ViewModels
         }
 
         List<double[][]> userTrainingData = new List<double[][]>();
-        List<double[][]> userLabledResults = new List<double[][]>();
+        List<double[][]> userLabeldResults = new List<double[][]>();
 
         public SymbolsRecognitionViewModel()
         {
@@ -142,9 +142,9 @@ namespace SymbolRecognitionLib.ViewModels
             //double[][] trainingInputs;
             //double[][] testingInputs;
 
-            //double[][] trainingLables;
+            //double[][] trainingLabels;
             //double[][] testingLabels;
-            //MNISTDataLoader.PrepeareData("..//..//..//MNISTDataset", out trainingInputs, out testingInputs, out trainingLables, out testingLabels, 10, 10);
+            //MNISTDataLoader.PrepeareData("..//..//..//MNISTDataset", out trainingInputs, out testingInputs, out trainingLabels, out testingLabels, 10, 10);
             //foreach (var img in trainingInputs)
             //{
             //    MNISTDataLoader.ConvertImageToBitmap(img).Rotate(15).DrawInConsole();
@@ -328,7 +328,7 @@ namespace SymbolRecognitionLib.ViewModels
 
             }
 
-            //userLabledResults.Add(expectedOutputs);
+            //userLabeldResults.Add(expectedOutputs);
         }
 
         void addDistortions(Bitmap symbol, ref List<Bitmap> storage, int offset, float scaleFactor)
