@@ -76,7 +76,7 @@ namespace SymbolRecognitionLib
             Stream fileStream;
 
             if (Path.GetExtension(filePath) == ".gz")
-                fileStream = Decompress(new FileInfo(filePath));
+                fileStream = FileManager.Decompress(filePath);
             else
                 fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
 
@@ -122,7 +122,7 @@ namespace SymbolRecognitionLib
             Stream fileStream;
 
             if (Path.GetExtension(filePath) == ".gz")
-                fileStream = Decompress(new FileInfo(filePath));
+                fileStream = FileManager.Decompress(filePath);
             else
                 fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
 
@@ -152,25 +152,6 @@ namespace SymbolRecognitionLib
             finally
             {
                 fileStream.Close();
-            }
-        }
-
-        public static MemoryStream Decompress(FileInfo fileToDecompress)
-        {
-            using (FileStream originalFileStream = fileToDecompress.OpenRead())
-            {
-                string currentFileName = fileToDecompress.FullName;
-                string newFileName = currentFileName.Remove(currentFileName.Length - fileToDecompress.Extension.Length);
-
-                MemoryStream decompressedFileStream = new MemoryStream();
-
-                using (GZipStream decompressionStream = new GZipStream(originalFileStream, CompressionMode.Decompress))
-                {
-                    decompressionStream.CopyTo(decompressedFileStream);
-                }
-
-                decompressedFileStream.Seek(0, SeekOrigin.Begin);
-                return decompressedFileStream;
             }
         }
     }

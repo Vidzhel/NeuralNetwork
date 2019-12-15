@@ -21,16 +21,25 @@ namespace SymbolRecognitionLib
 
     public static class BitmapDistortionsProducer
     {
-        static Graphics currentGraphics;
 
-        public static void BeginTransformation(this Bitmap sourceBitmap) {
-            currentGraphics = Graphics.FromImage(sourceBitmap);
-        }
-
-        public static void EndTransformation(this Bitmap sourceBitmap)
+        public static Bitmap FitSquare(this Bitmap sourceBitmap)
         {
-            currentGraphics.Dispose();
-            currentGraphics = null;
+            int size = Math.Max(sourceBitmap.Width, sourceBitmap.Height);
+
+            int horizontalPadding = (size - sourceBitmap.Width) / 2;
+            int verticalPadding = (size - sourceBitmap.Height) / 2;
+
+            Bitmap returnBitmap = new Bitmap(size, size);
+            returnBitmap.SetResolution(sourceBitmap.HorizontalResolution, sourceBitmap.VerticalResolution);
+
+            using (var brush = new SolidBrush(Color.White))
+            using (Graphics g = Graphics.FromImage(returnBitmap))
+            {
+                g.FillRectangle(brush, 0, 0, returnBitmap.Width, returnBitmap.Height);
+                g.DrawImage(sourceBitmap, new System.Drawing.Rectangle(horizontalPadding, verticalPadding, sourceBitmap.Width, sourceBitmap.Height), new System.Drawing.Rectangle(0, 0, sourceBitmap.Width, sourceBitmap.Height), GraphicsUnit.Pixel);
+            }
+
+            return returnBitmap;
         }
 
         public static Bitmap Rotate(this Bitmap sourceBitmap, float angle)

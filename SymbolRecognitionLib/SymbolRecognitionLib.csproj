@@ -69,6 +69,7 @@
   <ItemGroup>
     <Compile Include="BitmapDistortionsProducer.cs" />
     <Compile Include="Converters\BaseValueConverter.cs" />
+    <Compile Include="Converters\StringIntToBoolConverter.cs" />
     <Compile Include="Converters\BoolInverser.cs" />
     <Compile Include="Converters\BoolToVisibilityConverter.cs" />
     <Compile Include="FileManager.cs" />

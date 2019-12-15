@@ -9,10 +9,17 @@ using System.Linq;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SymbolRecognitionLib.ViewModels
 {
+    public enum GraphType
+    {
+        Accuracy,
+        Cost
+    }
+
     public class TrainNetworkViewModel : BaseViewModel
     {
         #region Binded data
@@ -22,6 +29,8 @@ namespace SymbolRecognitionLib.ViewModels
         public Command LoadTestingInputs { get; private set; }
         public Command LoadTestingLabels { get; private set; }
         public Command Train { get; private set; }
+        public Command CancelTraining { get; private set; }
+        public Command RestoreLastNetVersion { get; private set; }
         public Command ClearGraphs { get; private set; }
 
         private string trainingInputsFileName = "Not loaded";
@@ -74,7 +83,7 @@ namespace SymbolRecognitionLib.ViewModels
         private int? trainingDataCount = 0;
         public string TrainingDataCount
         {
-            get { return trainingDataCount == null? "All": trainingDataCount.ToString(); }
+            get { return trainingDataCount == null ? "All" : trainingDataCount.ToString(); }
             set
             {
                 if (string.Equals(value, "All", StringComparison.CurrentCultureIgnoreCase))
@@ -131,7 +140,7 @@ namespace SymbolRecognitionLib.ViewModels
                 else
                     generations = 0;
 
-                updateGraph();
+                initGraphs();
                 OnPropertyChanged(nameof(Generations));
             }
         }
@@ -166,7 +175,7 @@ namespace SymbolRecognitionLib.ViewModels
             }
         }
 
-        private double accuracyTolerance = 0.0;
+        private double accuracyTolerance = 0.5;
         public string AccuracyTolerance
         {
             get { return accuracyTolerance.ToString(); }
@@ -258,6 +267,17 @@ namespace SymbolRecognitionLib.ViewModels
             }
         }
 
+        private double trainingProgress;
+        public double TrainingProgress
+        {
+            get { return trainingProgress; }
+            set
+            {
+                trainingProgress = value;
+                OnPropertyChanged(nameof(TrainingProgress));
+            }
+        }
+
         private PlotModel trainingDataAccuracy = new PlotModel();
         public PlotModel TrainingDataAccuracy
         {
@@ -279,6 +299,8 @@ namespace SymbolRecognitionLib.ViewModels
                 OnPropertyChanged(nameof(TrainingDataCost));
             }
         }
+        public double accuracyMin = double.MaxValue;
+        public double accuracyMax;
 
         private PlotModel testingDataAccuracy = new PlotModel();
         public PlotModel TestingDataAccuracy
@@ -301,7 +323,8 @@ namespace SymbolRecognitionLib.ViewModels
                 OnPropertyChanged(nameof(TestingDataCost));
             }
         }
-
+        public double costMin = double.MaxValue;
+        public double costMax;
 
         #endregion
 
@@ -316,8 +339,10 @@ namespace SymbolRecognitionLib.ViewModels
 
         string testingInputsFilePath;
         string testingLabelsFilePath;
-        
+
         int trainingsInRow;
+        CancellationTokenSource cancellationTokenSource;
+        CancellationToken trainingCancellationToken;
 
         public TrainNetworkViewModel()
         {
@@ -333,6 +358,8 @@ namespace SymbolRecognitionLib.ViewModels
             LoadTestingLabels = new Command(chooseTestingLabel);
 
             Train = new Command(train);
+            CancelTraining = new Command(cancelTraining);
+            RestoreLastNetVersion = new Command(restoreNet);
             ClearGraphs = new Command(clearGraphs);
         }
 
@@ -342,7 +369,7 @@ namespace SymbolRecognitionLib.ViewModels
 
         void chooseTrainingInputs(object obj)
         {
-            string filePath = FileManager.OpenFileDialog("Mnist Dataset (*.mnist*)|*.mnist*|User Dataset (*.ninp)|*.ninp*", @"C:\work\C#\Neural Network\NeuralNetwork");
+            string filePath = FileManager.OpenFileDialog("Mnist Dataset (*.mnist*)|*.mnist*|User Dataset (*.ninp*)|*.ninp*", @"C:\work\C#\Neural Network\NeuralNetwork");
 
             if (string.IsNullOrEmpty(filePath))
                 return;
@@ -354,7 +381,7 @@ namespace SymbolRecognitionLib.ViewModels
 
         void chooseTrainingLabels(object obj)
         {
-            string filePath = FileManager.OpenFileDialog("Mnist Dataset (*.mnist*)|*.mnist*|User Dataset (*.nlabl)|*.nlabl*", @"C:\work\C#\Neural Network\NeuralNetwork");
+            string filePath = FileManager.OpenFileDialog("Mnist Dataset (*.mnist*)|*.mnist*|User Dataset (*.nlabl*)|*.nlabl*", @"C:\work\C#\Neural Network\NeuralNetwork");
 
             if (string.IsNullOrEmpty(filePath))
                 return;
@@ -408,7 +435,7 @@ namespace SymbolRecognitionLib.ViewModels
             else
             {
                 if (Path.GetExtension(trainingInputsFilePath) == ".gz")
-                    trainingInputs = resizeData((double[][])diserealize(MNISTDataLoader.Decompress(new FileInfo(trainingInputsFilePath))), trainingDataCount);
+                    trainingInputs = resizeData((double[][])diserealize(FileManager.Decompress(trainingInputsFilePath)), trainingDataCount);
                 else
                     trainingInputs = resizeData((double[][])diserealize(trainingInputsFilePath), trainingDataCount);
             }
@@ -430,7 +457,7 @@ namespace SymbolRecognitionLib.ViewModels
             else
             {
                 if (Path.GetExtension(trainingLabelsFilePath) == ".gz")
-                    trainingLabels = resizeData((double[][])diserealize(MNISTDataLoader.Decompress(new FileInfo(trainingLabelsFilePath))), trainingDataCount);
+                    trainingLabels = resizeData((double[][])diserealize(FileManager.Decompress(trainingLabelsFilePath)), trainingDataCount);
                 else
                     trainingLabels = resizeData((double[][])diserealize(trainingLabelsFilePath), trainingDataCount);
             }
@@ -450,7 +477,7 @@ namespace SymbolRecognitionLib.ViewModels
             else
             {
                 if (Path.GetExtension(testingInputsFilePath) == ".gz")
-                    testingInputs = resizeData((double[][])diserealize(MNISTDataLoader.Decompress(new FileInfo(testingInputsFilePath))), testingDataCount);
+                    testingInputs = resizeData((double[][])diserealize(FileManager.Decompress(testingInputsFilePath)), testingDataCount);
                 else
                     testingInputs = resizeData((double[][])diserealize(testingInputsFilePath), testingDataCount);
             }
@@ -469,7 +496,7 @@ namespace SymbolRecognitionLib.ViewModels
             else
             {
                 if (Path.GetExtension(testingLabelsFilePath) == ".gz")
-                    testingLabels = resizeData((double[][])diserealize(MNISTDataLoader.Decompress(new FileInfo(testingLabelsFilePath))), testingDataCount);
+                    testingLabels = resizeData((double[][])diserealize(FileManager.Decompress(testingLabelsFilePath)), testingDataCount);
                 else
                     testingLabels = resizeData((double[][])diserealize(testingLabelsFilePath), testingDataCount);
             }
@@ -511,37 +538,19 @@ namespace SymbolRecognitionLib.ViewModels
 
         #endregion
 
-        void clearGraphs(object obj)
-        {
-            initGraphs();
-            trainingsInRow = 0;
-        }
 
         void tryActivateTrain()
         {
-            if (!string.IsNullOrEmpty(trainingInputsFilePath) && string.IsNullOrEmpty(trainingLabelsFilePath))
+            if (!string.IsNullOrEmpty(trainingInputsFilePath) && !string.IsNullOrEmpty(trainingLabelsFilePath) && !IsTrainingInTheProcess)
+            {
                 TrainActive = true;
+                return;
+            }
+
+            TrainActive = false;
         }
 
-        void train(object obj)
-        {
-            IsTrainingInTheProcess = true;
-            trainingsInRow++;
-            loadData();
-            addSeries();
-            cheickLoadedData();
-
-            try
-            {
-                foreach (var monitorData in ApplicationService.GetNeuralNetwork.Train(trainingInputs, trainingLabels, learningRate, generations, miniBatchSize, testingInputs, testingLabels, regularizationFactor, monitorTrainingCost, monitorTrainingAccuracy, monitorTestingCost, monitorTestingAccuracy, accuracyTolerance))
-                    populateGraphsWithData(monitorData);
-            }
-            finally
-            {
-                IsTrainingInTheProcess = false;
-            }
-        }
-        void cheickLoadedData()
+        void cheickLoadedTestingData()
         {
             if (testingInputs == null || testingLabels == null)
             {
@@ -553,48 +562,121 @@ namespace SymbolRecognitionLib.ViewModels
             }
         }
 
+        void train(object obj)
+        {
+            if (IsTrainingInTheProcess)
+                return;
+
+            Task.Run(() =>
+            {
+                IsTrainingInTheProcess = true;
+
+                try
+                {
+                    TrainingProgress = 0;
+                    double progressStep = 95.0 / generations;
+
+                    prepareTraining();
+                    ApplicationService.BackupNetwork();
+
+                    TrainingProgress = 5;
+
+                    foreach (var monitorData in ApplicationService.GetNeuralNetwork.Train(trainingInputs, trainingLabels, learningRate, generations, miniBatchSize, trainingCancellationToken, testingInputs, testingLabels, regularizationFactor, monitorTrainingCost, monitorTrainingAccuracy, monitorTestingCost, monitorTestingAccuracy, accuracyTolerance))
+                    {
+                        populateGraphsWithData(monitorData);
+                        TrainingProgress += progressStep;
+                    }
+                }
+                catch (OperationCanceledException e)
+                {
+                    ApplicationService.RestoreNetwork();
+                }
+                catch (Exception e)
+                {
+                }
+                finally
+                {
+                    IsTrainingInTheProcess = false;
+                    tryActivateTrain();
+                    cancellationTokenSource.Dispose();
+                }
+            });
+        }
+
+        void prepareTraining()
+        {
+            tryActivateTrain();
+            trainingsInRow++;
+
+            loadData();
+            if (trainingInputs == null || trainingLabels == null)
+                throw new Exception();
+
+            cheickLoadedTestingData();
+            addSeries();
+
+            cancellationTokenSource = new CancellationTokenSource();
+            trainingCancellationToken = cancellationTokenSource.Token;
+        }
+
+        void cancelTraining(object obj)
+        {
+            if (!isTrainingInTheProcess)
+                return;
+
+            cancellationTokenSource.Cancel();
+        }
+
+        void restoreNet(object obj)
+        {
+            ApplicationService.RestoreNetwork();
+        }
+
+        void clearGraphs(object obj)
+        {
+            initGraphs();
+            trainingsInRow = 0;
+        }
+
         #region Graph related methods
 
         void initGraphs()
         {
-            trainingDataAccuracy = new PlotModel();
-            trainingDataAccuracy.Subtitle = "Training data accuracy";
-            initAxes(trainingDataAccuracy, "Accuracy");
+            Task.Run(() =>
+            {
 
-            trainingDataCost = new PlotModel();
-            trainingDataCost.Subtitle = "Training data cost";
-            initAxes(trainingDataCost, "Cost");
+                TrainingDataAccuracy = new PlotModel();
+                trainingDataAccuracy.Subtitle = "Training data accuracy";
+                initAxes(trainingDataAccuracy, GraphType.Accuracy);
 
-            testingDataAccuracy = new PlotModel();
-            testingDataAccuracy.Subtitle = "Testing data accuracy";
-            initAxes(testingDataAccuracy, "Accuracy");
+                TrainingDataCost = new PlotModel();
+                trainingDataCost.Subtitle = "Training data cost";
+                initAxes(trainingDataCost, GraphType.Cost);
 
-            testingDataCost = new PlotModel();
-            testingDataCost.Subtitle = "Training data cost";
-            initAxes(testingDataCost, "Cost");
+                TestingDataAccuracy = new PlotModel();
+                testingDataAccuracy.Subtitle = "Testing data accuracy";
+                initAxes(testingDataAccuracy, GraphType.Accuracy);
 
-            OnPropertyChanged(nameof(TrainingDataAccuracy));
-            OnPropertyChanged(nameof(TrainingDataCost));
-            OnPropertyChanged(nameof(TestingDataAccuracy));
-            OnPropertyChanged(nameof(TestingDataCost));
+                TestingDataCost = new PlotModel();
+                testingDataCost.Subtitle = "Training data cost";
+                initAxes(testingDataCost, GraphType.Cost);
 
-            trainingDataAccuracy.InvalidatePlot(true);
+                accuracyMax = 0;
+                costMax = 0;
+                accuracyMin = double.MaxValue;
+                costMin = double.MaxValue;
+            });
         }
 
-        void updateGraph()
+        void updateGraphs()
         {
-            initAxes(trainingDataAccuracy, "Accuracy");
-            initAxes(trainingDataCost, "Cost");
-            initAxes(testingDataAccuracy, "Accuracy");
-            initAxes(testingDataCost, "Cost");
-
             trainingDataAccuracy.InvalidatePlot(true);
             trainingDataCost.InvalidatePlot(true);
             testingDataAccuracy.InvalidatePlot(true);
             testingDataCost.InvalidatePlot(true);
         }
 
-        void initAxes(PlotModel plotModel, string leftAxisTitle)
+        void initAxes(PlotModel plotModel, GraphType type)
         {
             for (int i = 0; i < plotModel.Axes.Count; i++)
                 plotModel.Axes.RemoveAt(0);
@@ -603,37 +685,64 @@ namespace SymbolRecognitionLib.ViewModels
             bottomAxis.Title = "Generation";
             bottomAxis.Position = AxisPosition.Bottom;
             bottomAxis.Minimum = 0;
-            bottomAxis.Maximum = generations == 0 ? 1 : generations;
-            bottomAxis.MajorStep = 5;
-            bottomAxis.MinorStep = 2.5;
+            bottomAxis.Maximum = generations == 0 ? 1 : generations - 1;
+            bottomAxis.MajorStep = 2;
+            bottomAxis.MinorStep = 1;
+            bottomAxis.MajorGridlineColor = OxyColors.Gray;
+            bottomAxis.MajorGridlineStyle = LineStyle.Dot;
 
             var leftAxis = new LinearAxis();
-            leftAxis.Title = leftAxisTitle;
             leftAxis.Position = AxisPosition.Left;
-            leftAxis.Minimum = 0;
-            leftAxis.Maximum = 100;
-            leftAxis.MajorStep = 10;
-            leftAxis.MinorStep = 2.5;
+            leftAxis.MajorGridlineColor = OxyColors.Gray;
+            leftAxis.MajorGridlineStyle = LineStyle.Dot;
+
+            if (type == GraphType.Accuracy)
+            {
+                leftAxis.Title = "Accuracy";
+                leftAxis.Minimum = 50;
+                leftAxis.Maximum = 100;
+                leftAxis.MajorStep = 5;
+                leftAxis.MinorStep = 2.5;
+            }
+            else
+            {
+                leftAxis.Title = "Cost";
+                leftAxis.Minimum = 0;
+                leftAxis.Maximum = 2;
+                leftAxis.MajorStep = 0.2;
+                leftAxis.MinorStep = 0.1;
+            }
 
             plotModel.Axes.Add(bottomAxis);
             plotModel.Axes.Add(leftAxis);
         }
 
-        void addSeries()
+        void addSeries(byte transparancy = 64, double strokeThickness = 3)
         {
             string title = trainingsInRow.ToString();
 
-            var trainingDataAccuracySeries = new LineSeries();
+            var color = trainingDataAccuracy.DefaultColors[(trainingsInRow - 1) % trainingDataAccuracy.DefaultColors.Count];
+            OxyColor fill = OxyColor.FromArgb(transparancy, color.R, color.G, color.B);
+
+            var trainingDataAccuracySeries = new AreaSeries();
             trainingDataAccuracySeries.Title = title;
+            trainingDataAccuracySeries.Fill = fill;
+            trainingDataAccuracySeries.StrokeThickness = strokeThickness;
 
-            var trainingDataCostSeries = new LineSeries();
+            var trainingDataCostSeries = new AreaSeries();
             trainingDataCostSeries.Title = title;
+            trainingDataCostSeries.Fill = fill;
+            trainingDataCostSeries.StrokeThickness = strokeThickness;
 
-            var testingDataAccuracySeries = new LineSeries();
-            trainingDataAccuracySeries.Title = title;
+            var testingDataAccuracySeries = new AreaSeries();
+            testingDataAccuracySeries.Title = title;
+            testingDataAccuracySeries.Fill = fill;
+            testingDataAccuracySeries.StrokeThickness = strokeThickness;
 
-            var testingDataCostSeries = new LineSeries();
-            trainingDataCostSeries.Title = title;
+            var testingDataCostSeries = new AreaSeries();
+            testingDataCostSeries.Title = title;
+            testingDataCostSeries.Fill = fill;
+            testingDataCostSeries.StrokeThickness = strokeThickness;
 
             trainingDataAccuracy.Series.Add(trainingDataAccuracySeries);
             trainingDataCost.Series.Add(trainingDataCostSeries);
@@ -648,37 +757,68 @@ namespace SymbolRecognitionLib.ViewModels
 
             if (monitorTrainingAccuracy)
             {
-                LineSeries series = (LineSeries)trainingDataAccuracy.Series[trainingIndex];
-
-                series.Points.Add(new DataPoint(x, monitorData["trainingDataAccuracy"]));
-                //OnPropertyChanged(nameof(TrainingDataAccuracy));
-                trainingDataAccuracy.InvalidatePlot(true);
+                double y = monitorData["trainingDataAccuracy"];
+                populateModel(trainingDataAccuracy, x, y, trainingIndex, GraphType.Accuracy);
             }
             if (monitorTrainingCost)
             {
-                LineSeries series = (LineSeries)trainingDataCost.Series[trainingIndex];
-
-                series.Points.Add(new DataPoint(x, monitorData["trainingDataCost"]));
-                OnPropertyChanged(nameof(TrainingDataCost));
-                trainingDataCost.InvalidatePlot(true);
+                double y = monitorData["trainingDataCost"];
+                populateModel(trainingDataCost, x, y, trainingIndex, GraphType.Cost);
             }
             if (monitorTestingAccuracy)
             {
-                LineSeries series = (LineSeries)testingDataAccuracy.Series[trainingIndex];
+                double y = monitorData["testingDataAccuracy"];
+                populateModel(testingDataAccuracy, x, y, trainingIndex, GraphType.Accuracy);
 
-                series.Points.Add(new DataPoint(x, monitorData["testingDataAccuracy"]));
-                testingDataAccuracy.InvalidatePlot(true);
             }
             if (monitorTestingCost)
             {
-                LineSeries series = (LineSeries)testingDataCost.Series[trainingIndex];
+                double y = monitorData["testingDataCost"];
+                populateModel(testingDataCost, x, y, trainingIndex, GraphType.Cost);
 
-                series.Points.Add(new DataPoint(x, monitorData["testingDataCost"]));
-                testingDataCost.InvalidatePlot(true);
             }
 
+            updateZoom(trainingDataAccuracy, accuracyMin, accuracyMax, 5);
+            updateZoom(trainingDataCost, costMin, costMax, 0.2);
+            updateZoom(testingDataAccuracy, accuracyMin, accuracyMax, 5);
+            updateZoom(testingDataCost, costMin, costMax, 0.2);
+
+            updateGraphs();
         }
-        
+
+        void populateModel(PlotModel model, double x, double y, int trainingIndex, GraphType type)
+        {
+            LineSeries series = (LineSeries)model.Series[trainingIndex];
+            series.Points.Add(new DataPoint(x, y));
+
+            if (type == GraphType.Accuracy)
+            {
+                if (y != 0)
+                    accuracyMin = Math.Min(y, accuracyMin);
+                accuracyMax = Math.Max(y, accuracyMax);
+            }
+            else
+            {
+                if (y != 0)
+                    costMin = Math.Min(y, costMin);
+                costMax = Math.Max(y, costMax);
+            }
+        }
+
+        void updateZoom(PlotModel model, double min, double max, double padding = 5)
+        {
+            min = min == double.MaxValue ? 0 : min;
+
+            foreach (var axis in model.Axes)
+            {
+                if (axis.Position != AxisPosition.Left)
+                    continue;
+
+                axis.Minimum = min - padding;
+                axis.Maximum = max + padding;
+            }
+        }
+
         #endregion
 
         #endregion

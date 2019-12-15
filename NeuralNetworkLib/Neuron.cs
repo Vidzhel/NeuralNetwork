@@ -13,13 +13,13 @@ namespace NeuralNetworkLib
         public LayerType LayerType { get; private set; }
         public double[] LastInputs { get; private set; }
         public double LastOutput { get; private set; }
+        public Function<double, double> ActivationFunction { get; private set; }
 
         #endregion
 
         #region private Members
 
         static int neuronsCount = 0;
-        Function<double, double> activationFunction;
         Random rnd;
 
         double[] weightDeltas;
@@ -33,11 +33,11 @@ namespace NeuralNetworkLib
         /// <summary>
         /// Randomly fills weights and biases
         /// </summary>
-        public Neuron(int inputsCount, LayerType layerType, Function<double, double> activationFunction)
+        public Neuron(int inputsCount, LayerType layerType, Function<double, double> ActivationFunction)
         {
             Weights = new double[inputsCount];
             LayerType = layerType;
-            this.activationFunction = activationFunction;
+            this.ActivationFunction = ActivationFunction;
             weightDeltas = new double[Weights.Length];
 
             neuronsCount++;
@@ -48,15 +48,30 @@ namespace NeuralNetworkLib
                 Weights[i] = rnd.NextGaussian() / Math.Sqrt(inputsCount);
         }
 
-        public Neuron(double[] weights, double bias, LayerType layerType, Function<double, double> activationFunction)
+        public Neuron(double[] weights, double bias, LayerType layerType, Function<double, double> ActivationFunction)
         {
             Weights = weights;
             Bias = bias;
             LayerType = layerType;
-            this.activationFunction = activationFunction;
+            this.ActivationFunction = ActivationFunction;
             weightDeltas = new double[Weights.Length];
 
             neuronsCount++;
+        }
+
+        public Neuron(Neuron neuron)
+        {
+            Weights = new double[neuron.Weights.Length];
+            LayerType = neuron.LayerType;
+            this.ActivationFunction = neuron.ActivationFunction;
+            weightDeltas = new double[Weights.Length];
+
+            neuronsCount++;
+
+            Bias = neuron.Bias;
+
+            for (int weight = 0; weight < Weights.Length; weight++)
+                Weights[weight] = neuron.Weights[weight];
         }
 
         #endregion
@@ -78,7 +93,7 @@ namespace NeuralNetworkLib
 
             LastOutput = sum;
 
-            return activationFunction.Func(sum);
+            return ActivationFunction.Func(sum);
         }
 
         public double BackPropagation(double error)
@@ -126,7 +141,7 @@ namespace NeuralNetworkLib
 
         double calculateDelta(double error)
         {
-            return error * activationFunction.DerivativeFunc(LastOutput);
+            return error * ActivationFunction.DerivativeFunc(LastOutput);
         }
     }
 }

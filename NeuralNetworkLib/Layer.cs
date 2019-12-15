@@ -29,11 +29,25 @@ namespace NeuralNetworkLib
             Neurons = new Neuron[NeuronsCount];
             Type = layerType;
 
-            for (int i = 0; i < Neurons.Length; i++)
-                Neurons[i] = new Neuron(InputsCount, layerType, activationFunction);
+            for (int neuron = 0; neuron < Neurons.Length; neuron++)
+                Neurons[neuron] = new Neuron(InputsCount, layerType, activationFunction);
 
             OutputsCount = NeuronsCount;
             this.InputsCount = InputsCount;
+            setLayerWeights();
+        }
+
+        public Layer(Layer layer)
+        {
+            Neurons = new Neuron[layer.Neurons.Length];
+
+            for (int neuron = 0; neuron < Neurons.Length; neuron++)
+                Neurons[neuron] = new Neuron(layer.Neurons[neuron]);
+            
+            Type = layer.Type;
+
+            OutputsCount = Neurons.Length;
+            InputsCount = layer.InputsCount;
             setLayerWeights();
         }
 

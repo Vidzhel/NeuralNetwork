@@ -1,7 +1,10 @@
 ﻿using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
 using System.Linq;
+using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -52,6 +55,49 @@ namespace SymbolRecognitionLib
             }
 
             return filePath;
+        }
+
+        public static MemoryStream Decompress(string filePath)
+        {
+            FileInfo fileToDecompress = new FileInfo(filePath); 
+
+            using (FileStream originalFileStream = fileToDecompress.OpenRead())
+            {
+                string currentFileName = fileToDecompress.FullName;
+                string newFileName = currentFileName.Remove(currentFileName.Length - fileToDecompress.Extension.Length);
+
+                MemoryStream decompressedFileStream = new MemoryStream();
+
+                using (GZipStream decompressionStream = new GZipStream(originalFileStream, CompressionMode.Decompress))
+                {
+                    decompressionStream.CopyTo(decompressedFileStream);
+                }
+
+                decompressedFileStream.Seek(0, SeekOrigin.Begin);
+                return decompressedFileStream;
+            }
+        }
+
+        public static void SaveFile(object obj, string filePath)
+        {
+            using (FileStream stream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
+            {
+                BinaryFormatter formatter = new BinaryFormatter();
+                formatter.Serialize(stream, obj);
+            }
+        }
+
+        public static object LoadFile(string filePath)
+        {
+            Stream fileStream;
+
+            if (filePath.Contains(".gz"))
+                fileStream = Decompress(filePath);
+            else
+                fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+
+                BinaryFormatter formatter = new BinaryFormatter();
+                return formatter.Deserialize(fileStream);
         }
     }
 }

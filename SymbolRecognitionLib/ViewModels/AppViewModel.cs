@@ -1,8 +1,10 @@
 ﻿using NeuralNetworkLib;
+using SymbolRecognitionLib.InversionOfControl;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace SymbolRecognitionLib.ViewModels
@@ -26,6 +28,51 @@ namespace SymbolRecognitionLib.ViewModels
             {
                 loadedNetworkName = value;
                 OnPropertyChanged(nameof(LoadedNetworkName));
+            }
+        }
+
+        string costFuncitonName;
+        public string CostFuncitonName
+        {
+            get
+            {
+                return costFuncitonName;
+            }
+
+            set
+            {
+                costFuncitonName = value;
+                OnPropertyChanged(nameof(CostFuncitonName));
+            }
+        }
+
+        string activationFunctionName;
+        public string ActivationFunctionName
+        {
+            get
+            {
+                return activationFunctionName;
+            }
+
+            set
+            {
+                activationFunctionName = value;
+                OnPropertyChanged(nameof(ActivationFunctionName));
+            }
+        }
+
+        string neuralNetworkTypology;
+        public string NeuralNetworkTypology
+        {
+            get
+            {
+                return neuralNetworkTypology;
+            }
+
+            set
+            {
+                neuralNetworkTypology = value;
+                OnPropertyChanged(nameof(NeuralNetworkTypology));
             }
         }
 
@@ -59,32 +106,32 @@ namespace SymbolRecognitionLib.ViewModels
         }
 
         Regex onlyArray = new Regex(@"^\d+ (?:\d+ )*\d+$");
-        int[] neuralNetworkTypology;
-        public string NeuralNetworkTypology
+        int[] newNeuralNetworkTypology;
+        public string NewNeuralNetworkTypology
         {
             get
             {
-                return neuralNetworkTypology == null ? "" : arrayToString(neuralNetworkTypology);
+                return newNeuralNetworkTypology == null ? "" : arrayToString(newNeuralNetworkTypology);
             }
 
             set
             {
                 if (string.IsNullOrEmpty(value))
                 {
-                    neuralNetworkTypology = new int[0];
+                    newNeuralNetworkTypology = new int[0];
                     CanCreateNetwork = false;
                 }
                 else if (onlyArray.IsMatch(value))
                 {
-                    neuralNetworkTypology = stringToArray(value);
+                    newNeuralNetworkTypology = stringToArray(value);
                     CanCreateNetwork = true;
                 }
                 else
                 {
-                    NeuralNetworkTypology = "";
+                    NewNeuralNetworkTypology = "";
                     CanCreateNetwork = false;
                 }
-                OnPropertyChanged(nameof(NeuralNetworkTypology));
+                OnPropertyChanged(nameof(NewNeuralNetworkTypology));
 
             }
         }
@@ -140,6 +187,7 @@ namespace SymbolRecognitionLib.ViewModels
         List<BaseViewModel> tabs = new List<BaseViewModel>();
 
         public NeuralNetwork NeuralNetwork { get; private set; }
+        public NeuralNetwork BackupedNetwork { get; private set; }
 
 
         #region Constructor
@@ -168,6 +216,17 @@ namespace SymbolRecognitionLib.ViewModels
         #endregion
 
 
+        public void RestoreNetwork()
+        {
+            if (BackupedNetwork != null)
+                NeuralNetwork = new NeuralNetwork(BackupedNetwork);
+        }
+
+        public void BackupNetwork()
+        {
+            BackupedNetwork = new NeuralNetwork(NeuralNetwork);
+        }
+
         #region Commands handlers
 
         void changeTab(object tabIndex)
@@ -185,6 +244,8 @@ namespace SymbolRecognitionLib.ViewModels
                 LoadedNetworkName = Path.GetFileName(filePath);
                 IsNetworkLoaded = true;
             }
+
+            loadNetworkInfo();
         }
 
         void saveNeuralNetwork(object obj)
@@ -200,11 +261,12 @@ namespace SymbolRecognitionLib.ViewModels
 
         void createNeuralNetwork(object obj)
         {
-            NeuralNetwork = new NeuralNetwork(neuralNetworkTypology, CostFunctions[choseCostFunction], ActivationFunctions[choseActivationFunction]);
+            NeuralNetwork = new NeuralNetwork(newNeuralNetworkTypology, CostFunctions[choseCostFunction], ActivationFunctions[choseActivationFunction]);
 
             IsNetworkLoaded = true;
             LoadedNetworkName = "new_nn.net";
-            NeuralNetworkTypology = "";
+            NewNeuralNetworkTypology = "";
+            loadNetworkInfo();
         }
         #endregion
 
@@ -229,6 +291,19 @@ namespace SymbolRecognitionLib.ViewModels
                 res[i] = int.Parse(strings[i]);
 
             return res;
+        }
+
+        void loadNetworkInfo()
+        {
+            CostFuncitonName = NeuralNetwork.CostFunction.Name;
+            ActivationFunctionName = NeuralNetwork.Layers.FirstOrDefault()?.Neurons.First().ActivationFunction.Name ?? "None";
+
+            int[] typology = new int[NeuralNetwork.Layers.Count];
+
+            for (int layer = 0; layer < typology.Length; layer++)
+                typology[layer] = NeuralNetwork.Layers[layer].OutputsCount;
+
+            NeuralNetworkTypology = arrayToString(typology);
         }
 
         #endregion

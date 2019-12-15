@@ -14,5 +14,16 @@ namespace SymbolRecognitionLib.InversionOfControl
         public static AppViewModel GetAppViewModel { get { if (appViewModel == null) appViewModel = new AppViewModel(); return appViewModel; } }
 
         public static NeuralNetwork GetNeuralNetwork => GetAppViewModel.NeuralNetwork;
+
+        public static void BackupNetwork()
+        {
+            GetAppViewModel.BackupNetwork();
+        }
+
+        public static void RestoreNetwork()
+        {
+            GetAppViewModel.RestoreNetwork();
+        }
+
     }
 }

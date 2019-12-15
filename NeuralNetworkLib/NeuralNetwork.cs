@@ -3,13 +3,82 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.Serialization.Formatters.Binary;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace NeuralNetworkLib
 {
+    public class TrainingData
+    {
+        public double[][] trainingInputs { get; private set; }
+        public double[][] expectedTrainingOutputs { get; private set; }
+
+        public double[][] testingInputs { get; private set; }
+        public double[][] expectedTestingOutputs { get; private set; }
+
+        public float learningRate { get; private set; }
+        public int generations { get; private set; }
+        public int miniBatchSize { get; private set; }
+        public double regularizationFactor { get; private set; }
+        public double accuracyTolerance { get; private set; }
+
+        public CancellationToken token { get; private set; }
+
+        public bool monitorTrainingDataCost { get; private set; }
+        public bool monitorTrainingDataAccuracy { get; private set; }
+        public bool monitorTestingDataCost { get; private set; }
+        public bool monitorTestingDataAccuracy { get; private set; }
+
+        public int trainingDataCount { get; private set; }
+        public Random rnd { get; private set; }
+        public int[] trainingDataOrder { get; private set; }
+        public int miniBatchCount { get; private set; }
+
+        public TrainingData(double[][] trainingInputs, double[][] expectedTrainingOutputs, float learningRate, int generations, int miniBatchSize, CancellationToken token, double[][] testingInputs = null, double[][] expectedTestingOutputs = null, double regularizationFactor = 0.0,
+            bool monitorTrainingDataCost = false, bool monitorTrainingDataAccuracy = false, bool monitorTestingDataCost = false, bool monitorTestingDataAccuracy = false, double accuracyTolerance = 0.01)
+        {
+            this.trainingInputs = trainingInputs;
+            this.expectedTrainingOutputs = expectedTrainingOutputs;
+
+            this.testingInputs = testingInputs;
+            this.expectedTestingOutputs = expectedTestingOutputs;
+
+            this.learningRate = learningRate;
+            this.generations = generations;
+            this.miniBatchSize = miniBatchSize;
+            this.token = token;
+            this.regularizationFactor = regularizationFactor;
+            this.accuracyTolerance = accuracyTolerance;
+
+            this.monitorTrainingDataCost = monitorTrainingDataCost;
+            this.monitorTrainingDataAccuracy = monitorTrainingDataAccuracy;
+            this.monitorTestingDataCost = monitorTestingDataCost;
+            this.monitorTestingDataAccuracy = monitorTestingDataAccuracy;
+
+            initData();
+        }
+
+        public void initData()
+        {
+            trainingDataCount = trainingInputs.Length;
+
+            rnd = new Random(miniBatchSize + generations);
+            trainingDataOrder = new int[trainingDataCount];
+            trainingDataOrder = trainingDataOrder.Select((x, index) => index).ToArray();
+
+            miniBatchCount = (int)Math.Ceiling((double)trainingDataCount / miniBatchSize);
+        }
+
+        public void ShaffleTrainingDataOrder()
+        {
+            trainingDataOrder = trainingDataOrder.OrderBy(x => rnd.Next(0, (int)trainingDataCount)).ToArray();
+        }
+    }
+
     [Serializable]
     public class NeuralNetwork
     {
-        #region pyblic Members
+        #region public Members
 
         public List<Layer> Layers;
         public List<Layer> ReversedLayers;
@@ -52,6 +121,15 @@ namespace NeuralNetworkLib
             }
         }
 
+        public NeuralNetwork(NeuralNetwork net)
+        {
+            CostFunction = net.CostFunction;
+            Layers = new List<Layer>();
+
+            foreach (var layer in net.Layers)
+                Layers.Add(new Layer(layer));
+        }
+
         #endregion
 
         #region public methods
@@ -69,61 +147,127 @@ namespace NeuralNetworkLib
         /// <param name="regularizationFactor">controls the growth of the weights, the bigger factor, the closer weights will be to zero</param>
         /// <returns>Each iteration returns monitor data in the array with the size of 5, where values can be null in the case the monitor
         /// flags are set to false. Monitor data in the array follows the next order: generation, trainingDataCost, trainingDataAccuracy, testingDataCost, testingDataAccuracy</returns>
-        public IEnumerable<Dictionary<string, double>> Train(double[][] trainingInputs, double[][] expectedTrainingOutputs, float learningRate, int generations, int miniBatchSize, double[][] testingInputs = null, double[][] expectedTestingOutputs = null, double regularizationFactor = 0.0,
+        public IEnumerable<Dictionary<string, double>> Train(double[][] trainingInputs, double[][] expectedTrainingOutputs, float learningRate, int generations, int miniBatchSize, CancellationToken token, double[][] testingInputs = null, double[][] expectedTestingOutputs = null, double regularizationFactor = 0.0,
             bool monitorTrainingDataCost = false, bool monitorTrainingDataAccuracy = false, bool monitorTestingDataCost = false, bool monitorTestingDataAccuracy = false, double accuracyTolerance = 0.01)
         {
-            int trainingDataCount = trainingInputs.Length;
-
-            Random rnd = new Random(miniBatchSize + generations);
-            int[] trainingDataOrder = new int[trainingDataCount];
-            trainingDataOrder = trainingDataOrder.Select((x, index) => index).ToArray();
-
-            int miniBatchCount = (int)Math.Ceiling((double)trainingDataCount / miniBatchSize);
+            token.ThrowIfCancellationRequested();
+            TrainingData trainingData = new TrainingData(trainingInputs, expectedTrainingOutputs, learningRate, generations, miniBatchSize, token, testingInputs, expectedTestingOutputs, regularizationFactor, monitorTrainingDataCost, monitorTrainingDataAccuracy, monitorTestingDataCost, monitorTestingDataAccuracy, accuracyTolerance);
 
             for (int gen = 0; gen < generations; gen++)
             {
-                // Shuffle training data
-                trainingDataOrder = trainingDataOrder.OrderBy(x => rnd.Next(0, (int)trainingDataCount)).ToArray();
+                var monitorData = trainGenerationAsync(trainingData, token).Result;
 
-
-                // Process each train data in a batch and update neuron's weights and biases
-                for (int miniBatch = 0; miniBatch < miniBatchCount; miniBatch++)
-                {
-                    for (int training = 0; training < miniBatchSize; training++)
-                    {
-                        int trainingSample = training + miniBatch * miniBatchSize;
-                        if (trainingSample >= trainingDataCount)
-                            break;
-
-                        double[] inputs = trainingInputs[trainingDataOrder[trainingSample]];
-                        double[] expectedOutputs = expectedTrainingOutputs[trainingDataOrder[trainingSample]];
-
-                        double[] actualOutputs = Evaluate(inputs);
-
-                        backPropagation(expectedOutputs, actualOutputs);
-
-                    }
-
-                    updateWeights(learningRate, regularizationFactor, trainingDataCount);
-                }
-
-                Dictionary<string, double> monitorData = new Dictionary<string, double>();
+                if (monitorData == null)
+                    throw new OperationCanceledException();
 
                 monitorData["generation"] = gen;
-
-                if (monitorTrainingDataCost)
-                    monitorData["trainingDataCost"] = GetCost(trainingInputs, expectedTrainingOutputs);
-                if (monitorTrainingDataAccuracy)
-                    monitorData["trainingDataAccuracy"] = GetAccuracy(trainingInputs, expectedTrainingOutputs, accuracyTolerance);
-                if (monitorTestingDataCost && testingInputs != null && expectedTestingOutputs != null)
-                    monitorData["testingDataCost"] = GetCost(testingInputs, expectedTestingOutputs);
-                if (monitorTestingDataAccuracy && testingInputs != null && expectedTestingOutputs != null)
-                    monitorData["testingDataAccuracy"] = GetAccuracy(testingInputs, expectedTestingOutputs, accuracyTolerance);
 
                 yield return monitorData;
             }
 
         }
+
+        public IEnumerable<Dictionary<string, double>> Train(TrainingData trainingData, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+
+            for (int gen = 0; gen < trainingData.generations; gen++)
+            {
+                var monitorData = trainGenerationAsync(trainingData, token).Result;
+
+                if (monitorData == null)
+                    throw new OperationCanceledException();
+
+                monitorData["generation"] = gen;
+
+                yield return monitorData;
+            }
+        }
+
+        #region Train helpers
+
+
+        Task<Dictionary<string, double>> trainGenerationAsync(TrainingData trainingData, CancellationToken? token = null)
+        {
+               return Task.Run<Dictionary<string, double>>(() => trainGeneration(trainingData, token));
+        }
+
+        Dictionary<string, double> trainGeneration(TrainingData trainingData, CancellationToken? token = null)
+        {
+            try
+            { 
+                trainingData.ShaffleTrainingDataOrder();
+
+                // Process each train data in a batch and update neuron's weights and biases
+                for (int miniBatch = 0; miniBatch < trainingData.miniBatchCount; miniBatch++)
+                {
+                    for (int training = 0; training < trainingData.miniBatchSize; training++)
+                    {
+                        int trainingSample = training + miniBatch * trainingData.miniBatchSize;
+                        if (trainingSample >= trainingData.trainingDataCount)
+                            break;
+
+                        token?.ThrowIfCancellationRequested();
+
+                        feedAndPropagate(trainingData, trainingSample);
+
+                        token?.ThrowIfCancellationRequested();
+                    }
+
+                    updateWeights(trainingData.learningRate, trainingData.regularizationFactor, trainingData.trainingDataCount);
+                }
+
+
+                return prepareMonitoringData(trainingData, token);
+            }
+
+            catch (OperationCanceledException e)
+            {
+                return null;
+            }
+        }
+
+        void feedAndPropagate(TrainingData trainingData, int trainingSample)
+        {
+            double[] inputs = trainingData.trainingInputs[trainingData.trainingDataOrder[trainingSample]];
+            double[] expectedOutputs = trainingData.expectedTrainingOutputs[trainingData.trainingDataOrder[trainingSample]];
+
+            double[] actualOutputs = Evaluate(inputs);
+
+            backPropagation(expectedOutputs, actualOutputs);
+        }
+
+        Dictionary<string, double> prepareMonitoringData(TrainingData trainingData, CancellationToken? token)
+        {
+            Dictionary<string, double> monitorData = new Dictionary<string, double>();
+
+
+            token?.ThrowIfCancellationRequested();
+
+            if (trainingData.monitorTrainingDataCost)
+                monitorData["trainingDataCost"] = GetCost(trainingData.trainingInputs, trainingData.expectedTrainingOutputs);
+
+            token?.ThrowIfCancellationRequested();
+
+            if (trainingData.monitorTrainingDataAccuracy)
+                monitorData["trainingDataAccuracy"] = GetAccuracy(trainingData.trainingInputs, trainingData.expectedTrainingOutputs, trainingData.accuracyTolerance);
+
+            token?.ThrowIfCancellationRequested();
+
+            if (trainingData.monitorTestingDataCost && trainingData.testingInputs != null && trainingData.expectedTestingOutputs != null)
+                monitorData["testingDataCost"] = GetCost(trainingData.testingInputs, trainingData.expectedTestingOutputs);
+
+            token?.ThrowIfCancellationRequested();
+
+            if (trainingData.monitorTestingDataAccuracy && trainingData.testingInputs != null && trainingData.expectedTestingOutputs != null)
+                monitorData["testingDataAccuracy"] = GetAccuracy(trainingData.testingInputs, trainingData.expectedTestingOutputs, trainingData.accuracyTolerance);
+
+            token?.ThrowIfCancellationRequested();
+
+            return monitorData;
+        }
+
+        #endregion
 
         public double[] Evaluate(double[] input)
         {
