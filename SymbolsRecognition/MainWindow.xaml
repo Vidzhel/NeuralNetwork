@@ -10,7 +10,7 @@
         xmlns:local="clr-namespace:SymbolsRecognition"
         
         mc:Ignorable="d"
-        Title="Symbols Recognition" Height="500" Width="1000">
+        Title="Symbols Recognition" Height="600" Width="1000">
     <Grid>
 
         <Grid.ColumnDefinitions>
@@ -35,7 +35,7 @@
             <TextBlock Text="Create neural network:" FontSize="14" Margin="0 10 0 10" FontWeight="DemiBold"/>
             <TextBlock Text="Typology:"/>
             <TextBox Text="{Binding NewNeuralNetworkTypology, UpdateSourceTrigger=LostFocus}" Margin="0 5 0 0"/>
-        
+
             <TextBlock Text="Cost Function:"/>
             <ComboBox Margin="0 0 0 10" ItemsSource="{Binding CostFunctions}" SelectedIndex="{Binding ChoseCostFunction}">
                 <ComboBox.ItemTemplate>
@@ -58,7 +58,7 @@
         </StackPanel>
 
         <TabControl x:Name="Tabs" Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" IsEnabled="{Binding IsNetworkLoaded}">
-            
+
             <i:Interaction.Triggers>
                 <i:EventTrigger EventName="SelectionChanged">
                     <i:InvokeCommandAction Command="{Binding ChangeTab}" CommandParameter="{Binding ElementName=Tabs, Path=SelectedIndex}"/>
@@ -75,6 +75,7 @@
                     <Border Name="CanvasBorder" BorderThickness="2" BorderBrush="AntiqueWhite">
                         <InkCanvas  Name="Canvas" ResizeEnabled="False" DefaultDrawingAttributes="{Binding Brush}"
                                     MaxWidth="{Binding ActualWidth, ElementName=CanvasBorder}"
+                                    IsEnabled="{Binding IsProcessing, Converter={conv:BoolInverser}}"
                                     MaxHeight="{Binding ActualHeight, ElementName=CanvasBorder}">
                             <i:Interaction.Triggers>
                                 <i:EventTrigger EventName="Loaded">
@@ -84,7 +85,7 @@
                         </InkCanvas>
                     </Border>
 
-                    <Grid Grid.Row="1" Margin="0 10 0 0">
+                    <Grid Grid.Row="1" Margin="0 10 0 0" IsEnabled="{Binding IsProcessing, Converter={conv:BoolInverser}}">
 
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -96,23 +97,31 @@
                             <RadioButton Content="Brush" IsChecked="{Binding IsBrush}"/>
                             <RadioButton Content="Eraser"/>
 
-                            <Button Content="Process" Width="80" HorizontalAlignment="Left" Margin="0 16 5 5" VerticalContentAlignment="Center" Height="22" Command="{Binding ProcessUserInput}" CommandParameter="{Binding ElementName=Canvas}"/>
+                            <Button Content="Process" Width="80" HorizontalAlignment="Left" Margin="0 16 5 5" VerticalContentAlignment="Center" Height="22" Command="{Binding ProcessUserInput}"  CommandParameter="{Binding ElementName=Canvas}"/>
                             <TextBlock Text="Result:"/>
-                            <TextBox Text="{Binding Output}" IsReadOnly="True"/>
+                            <Border BorderBrush="AntiqueWhite" BorderThickness="2">
+                                <RichTextBox Name="Output" Height="70">
+                                    <i:Interaction.Triggers>
+                                        <i:EventTrigger EventName="Loaded">
+                                            <i:InvokeCommandAction Command="{Binding OnOutputBoxLoaded}" CommandParameter="{Binding ElementName=Output}"/>
+                                        </i:EventTrigger>
+                                    </i:Interaction.Triggers>
+                                </RichTextBox>
+                            </Border>
                         </StackPanel>
 
                         <StackPanel Grid.Column="1">
                             <TextBlock Text="Brush size:"/>
                             <TextBox Width="80" Text="{Binding BrushSize}" HorizontalAlignment="Left"/>
 
-                            <Button Content="Clear Canvas" Width="80" Margin="0 10 0 0" HorizontalAlignment="Left" VerticalContentAlignment="Center" Height="22" Command="{Binding ClearCanvas}" CommandParameter="{Binding ElementName=Canvas}"/>
+                            <Button Content="Clear Canvas" Width="80" Margin="0 10 0 0" HorizontalAlignment="Left" VerticalContentAlignment="Center" Height="22" Command="{Binding ClearCanvas}" IsEnabled="{Binding IsProcessing, Converter={conv:BoolInverser}}" CommandParameter="{Binding ElementName=Canvas}"/>
                         </StackPanel>
 
                         <StackPanel Grid.Column="2">
                             <CheckBox Content="Show border boxes" IsChecked="{Binding ShowBorderBoxes}"/>
                             <CheckBox x:Name="ClassifyResults" Content="Clasify results" IsChecked="{Binding ClassifyResults}"/>
 
-                            <TextBlock Text="Expected result:" Visibility="{Binding ElementName=ClassifyResults, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}" Margin="0 10 0 0"/>
+                            <TextBlock Text="Expected result:" Visibility="{Binding ElementName=ClassifyResults, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}" Margin="0 5 0 0"/>
                             <TextBox Text="{Binding ExpectedResults}" Visibility="{Binding ElementName=ClassifyResults, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}"/>
 
                             <Grid>
@@ -120,11 +129,14 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                
-                                <Button Content="Save labeled" Width="80" Margin="0 10 0 0" HorizontalAlignment="Left" Visibility="{Binding ElementName=ClassifyResults, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}" IsEnabled="{Binding ElementName=LabeledDataCount, Path=Text, Converter={conv:StringIntToBoolConverter}}"/>
+
+                                <StackPanel>
+                                    <Button Content="Save labeled data" Width="120" Margin="0 10 0 0" HorizontalAlignment="Left" Command="{Binding SaveLabeledData}" Visibility="{Binding ElementName=ClassifyResults, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}" IsEnabled="{Binding ElementName=LabeledDataCount, Path=Text, Converter={conv:StringIntToBoolConverter}}"/>
+                                    <Button Content="Clear labeled data" Width="120" Margin="0 10 0 0" HorizontalAlignment="Left" Command="{Binding ClearLabeledData}" Visibility="{Binding ElementName=ClassifyResults, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}" IsEnabled="{Binding ElementName=LabeledDataCount, Path=Text, Converter={conv:StringIntToBoolConverter}}"/>
+                                </StackPanel>
 
                                 <StackPanel Grid.Column="1">
-                                    <TextBlock Text="Count:" Visibility="{Binding ElementName=ClassifyResults, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}" Margin="0 10 0 0"/>
+                                    <TextBlock Text="Data Count:" Visibility="{Binding ElementName=ClassifyResults, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}" Margin="0 13 0 0"/>
                                     <TextBlock Name="LabeledDataCount" Text="{Binding LabeledDataCount}" Visibility="{Binding ElementName=ClassifyResults, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}" Margin="0 10 0 0"/>
                                 </StackPanel>
                             </Grid>
@@ -144,59 +156,63 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Margin="5">
-                        <Button Content="Load Training Inputs" Margin="0 0 0 5" Command="{Binding LoadTrainingInputs}"/>
-                        <TextBlock Text="{Binding TrainingInputsFileName}" Margin="0 0 0 5"/>
-                        
-                        <TextBlock Text="Training data count"/>
-                        <TextBox Text="{Binding TrainingDataCount}" Margin="0 0 0 5"/>
+                        <StackPanel IsEnabled="{Binding IsTrainingInTheProcess, Converter={conv:BoolInverser}}">
+                            <Button Content="Load Training Inputs" Margin="0 0 0 5" Command="{Binding LoadTrainingInputs}"/>
+                            <TextBlock Text="{Binding TrainingInputsFileName}" Margin="0 0 0 5"/>
 
-                        <TextBlock Text="Lerning rate:"/>
-                        <TextBox Margin="0 0 0 5" Text="{Binding LearningRate}"/>
+                            <TextBlock Text="Training data count"/>
+                            <TextBox Text="{Binding TrainingDataCount}" Margin="0 0 0 5"/>
 
-                        <TextBlock Text="Training batch size:"/>
-                        <TextBox Margin="0 0 0 5" Text="{Binding MiniBatchSize}"/>
+                            <TextBlock Text="Lerning rate:"/>
+                            <TextBox Margin="0 0 0 5" Text="{Binding LearningRate}"/>
 
-                        <CheckBox Content="Monitor Train. Accuracy" IsChecked="{Binding MonitorTrainingAccuracy}"/>
+                            <TextBlock Text="Training batch size:"/>
+                            <TextBox Margin="0 0 0 5" Text="{Binding MiniBatchSize}"/>
 
-                        <CheckBox Name="TestDataCheckbox" Content="Use Testing Data" Margin="0 5 0 5" IsChecked="{Binding UseTestingData}"/>
+                            <CheckBox Content="Monitor Train. Accuracy" IsChecked="{Binding MonitorTrainingAccuracy}"/>
 
-                        <Button Content="Load Training Inputs" Command="{Binding LoadTestingInputs}" Visibility="{Binding ElementName=TestDataCheckbox, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}"/>
-                        <TextBlock Text="{Binding TestingInputsFileName}" Margin="0 0 0 5" Visibility="{Binding ElementName=TestDataCheckbox, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}"/>
+                            <CheckBox Name="TestDataCheckbox" Content="Use Testing Data" Margin="0 5 0 5" IsChecked="{Binding UseTestingData}"/>
 
-                        <TextBlock Text="Testing data count" Visibility="{Binding ElementName=TestDataCheckbox, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}"/>
-                        <TextBox Text="{Binding TestingDataCount}" Margin="0 0 0 5" Visibility="{Binding ElementName=TestDataCheckbox, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}"/>
-                        
+                            <Button Content="Load Training Inputs" Command="{Binding LoadTestingInputs}" Visibility="{Binding ElementName=TestDataCheckbox, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}"/>
+                            <TextBlock Text="{Binding TestingInputsFileName}" Margin="0 0 0 5" Visibility="{Binding ElementName=TestDataCheckbox, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}"/>
+
+                            <TextBlock Text="Testing data count" Visibility="{Binding ElementName=TestDataCheckbox, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}"/>
+                            <TextBox Text="{Binding TestingDataCount}" Margin="0 0 0 5" Visibility="{Binding ElementName=TestDataCheckbox, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}"/>
+                        </StackPanel>
+
                         <Button Content="Train" Margin="0 0 0 10" Command="{Binding Train}" IsEnabled="{Binding TrainActive}"/>
                         <Button Content="Cancel" Margin="0 0 0 10" Command="{Binding CancelTraining}" IsEnabled="{Binding IsTrainingInTheProcess}"/>
                     </StackPanel>
 
                     <StackPanel Margin="5" Grid.Column="1">
-                        <Button Content="Load Training Labes" Command="{Binding LoadTrainingLabels}" Margin="0 0 0 5"/>
-                        <TextBlock Text="{Binding TrainingLabelsFileName}" Margin="0 0 0 5"/>
-                        
-                        <TextBlock Text="Generations:"/>
-                        <TextBox Margin="0 0 0 5" Text="{Binding Generations}"/>
+                        <StackPanel IsEnabled="{Binding IsTrainingInTheProcess, Converter={conv:BoolInverser}}">
+                            <Button Content="Load Training Labes" Command="{Binding LoadTrainingLabels}" Margin="0 0 0 5" IsEnabled="{Binding IsTrainingInTheProcess, Converter={conv:BoolInverser}}"/>
+                            <TextBlock Text="{Binding TrainingLabelsFileName}" Margin="0 0 0 5"/>
 
-                        <TextBlock Text="Regularization factor:"/>
-                        <TextBox Margin="0 0 0 5" Text="{Binding RegularizationFactor}"/>
+                            <TextBlock Text="Generations:"/>
+                            <TextBox Margin="0 0 0 5" Text="{Binding Generations}"/>
 
-                        <TextBlock Text="Accuracy threshold:"/>
-                        <TextBox Margin="0 0 0 5" Text="{Binding AccuracyTolerance}"/>
+                            <TextBlock Text="Regularization factor:"/>
+                            <TextBox Margin="0 0 0 5" Text="{Binding RegularizationFactor}"/>
 
-                        <CheckBox Content="Monitor Train. Cost" IsChecked="{Binding MonitorTrainingCost}"/>
+                            <TextBlock Text="Accuracy threshold:"/>
+                            <TextBox Margin="0 0 0 5" Text="{Binding AccuracyTolerance}"/>
 
-                        <Button Content="Load Training Labes" Margin="0 25 0 0" Command="{Binding LoadTestingLabels}" Visibility="{Binding ElementName=TestDataCheckbox, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}"/>
-                        <TextBlock Text="{Binding TestingLabelsFileName}" Margin="0 0 0 5" Visibility="{Binding ElementName=TestDataCheckbox, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}"/>
+                            <CheckBox Content="Monitor Train. Cost" IsChecked="{Binding MonitorTrainingCost}"/>
 
-                        <CheckBox Content="Monitor Test. Cost" Visibility="{Binding ElementName=TestDataCheckbox, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}" IsChecked="{Binding MonitorTestingCost}"/>
-                        <CheckBox Content="Monitor Test. Accuracy" Margin="0 0 0 5" Visibility="{Binding ElementName=TestDataCheckbox, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}" IsChecked="{Binding MonitorTestingAccuracy}"/>
-                    
+                            <Button Content="Load Training Labes" Margin="0 25 0 0" Command="{Binding LoadTestingLabels}" Visibility="{Binding ElementName=TestDataCheckbox, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}"/>
+                            <TextBlock Text="{Binding TestingLabelsFileName}" Margin="0 0 0 5" Visibility="{Binding ElementName=TestDataCheckbox, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}"/>
+
+                            <CheckBox Content="Monitor Test. Cost" Visibility="{Binding ElementName=TestDataCheckbox, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}" IsChecked="{Binding MonitorTestingCost}"/>
+                            <CheckBox Content="Monitor Test. Accuracy" Margin="0 0 0 5" Visibility="{Binding ElementName=TestDataCheckbox, Path=IsChecked, Converter={conv:BoolToVisibilityConverter}}" IsChecked="{Binding MonitorTestingAccuracy}"/>
+                        </StackPanel>
+
                         <Button Content="Clear Graphs" Margin="0 5 0 10" Command="{Binding ClearGraphs}" IsEnabled="{Binding IsTrainingInTheProcess, Converter={conv:BoolInverser}}"/>
                         <Button Content="Restore last version" Command="{Binding RestoreLastNetVersion}" IsEnabled="{Binding IsTrainingInTheProcess, Converter={conv:BoolInverser}}"/>
 
                     </StackPanel>
 
-                    <ProgressBar Grid.Column="2" Grid.ColumnSpan="2" Height="20" Value="{Binding TrainingProgress}" VerticalAlignment="Bottom" Panel.ZIndex="2"/>
+                    <ProgressBar Grid.ColumnSpan="2" Height="20" Value="{Binding TrainingProgress}" VerticalAlignment="Bottom" Panel.ZIndex="2"/>
 
                     <Grid Grid.Column="2">
                         <Grid.RowDefinitions>
@@ -223,6 +239,9 @@
                 </Grid>
             </TabItem>
 
+            <TabItem Header="Data Viewer" DataContext="{Binding CurrentViewModel}">
+                
+            </TabItem>
         </TabControl>
     </Grid>
 </Window>

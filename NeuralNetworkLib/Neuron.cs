@@ -24,7 +24,7 @@ namespace NeuralNetworkLib
 
         double[] weightDeltas;
         double biasDelta;
-        int backPropagationsCount = 0;
+        int backPropagationsInRow = 0;
 
         #endregion
 
@@ -108,26 +108,22 @@ namespace NeuralNetworkLib
 
             biasDelta += delta;
 
-            backPropagationsCount++;
+            backPropagationsInRow++;
 
             return delta;
         }
 
         public void UpdateDerivatives(double learningRate, double regularizationFactor, double trainingDatasetSize)
         {
-            backPropagationsCount = backPropagationsCount == 0 ? 1 : backPropagationsCount;
+            backPropagationsInRow = backPropagationsInRow == 0 ? 1 : backPropagationsInRow;
 
             for (int i = 0; i < LastInputs.Length; i++)
-                //Weights[i] = Weights[i] - learningRate*weightDeltas[i]/backPropagationsCount;
-                Weights[i] = (1 - learningRate * regularizationFactor / trainingDatasetSize) * Weights[i] - learningRate * weightDeltas[i] / backPropagationsCount;
+                Weights[i] = (1 - learningRate * regularizationFactor / trainingDatasetSize) * Weights[i] - learningRate * weightDeltas[i] / backPropagationsInRow;
 
-            Bias -= learningRate * biasDelta / backPropagationsCount;
-
-            if (double.IsNaN(Bias))
-                throw new Exception();
+            Bias -= learningRate * biasDelta / backPropagationsInRow;
 
             // Clear deltas and counter
-            backPropagationsCount = 0;
+            backPropagationsInRow = 0;
             weightDeltas = new double[weightDeltas.Length];
             biasDelta = 0;
         }

@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -42,6 +44,57 @@ namespace SymbolRecognitionLib
             return returnBitmap;
         }
 
+        public static Bitmap CropToSize(this Bitmap source, Rectangle sourceRect, int width, int height)
+        {
+            var bmp = new Bitmap(width, height);
+            bmp.SetResolution(source.HorizontalResolution, source.VerticalResolution);
+
+            using (var ia = new ImageAttributes())
+            using (var brush = new SolidBrush(Color.White))
+            using (var gfx = Graphics.FromImage(bmp))
+            {
+                ia.SetWrapMode(WrapMode.TileFlipXY);
+                gfx.CompositingQuality = CompositingQuality.HighQuality;
+                gfx.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                gfx.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                gfx.SmoothingMode = SmoothingMode.AntiAlias;
+
+                gfx.FillRectangle(brush, 0, 0, bmp.Width, bmp.Height);
+                var rect = new System.Drawing.Rectangle(0, 0, width, height);
+
+                gfx.DrawImage(source, rect, (int)sourceRect.TopLeftCorner.X, (int)sourceRect.TopLeftCorner.Y, sourceRect.Width, sourceRect.Height, GraphicsUnit.Pixel, ia);
+            }
+
+            return bmp;
+        }
+
+        public static Bitmap CropToSize(this Bitmap source, int width, int height)
+        {
+            var bmp = new Bitmap(width, height);
+            bmp.SetResolution(source.HorizontalResolution, source.VerticalResolution);
+
+            using (var ia = new ImageAttributes())
+            using (var brush = new SolidBrush(Color.White))
+            using (var gfx = Graphics.FromImage(bmp))
+            {
+                ia.SetWrapMode(WrapMode.TileFlipXY);
+                gfx.CompositingQuality = CompositingQuality.HighQuality;
+                gfx.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                gfx.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                gfx.SmoothingMode = SmoothingMode.AntiAlias;
+                gfx.CompositingMode = CompositingMode.SourceCopy;
+
+                gfx.FillRectangle(brush, 0, 0, bmp.Width, bmp.Height);
+                var rect = new System.Drawing.Rectangle(0, 0, width, height);
+
+                gfx.DrawImage(source, rect, 0, 0, source.Width, source.Height, GraphicsUnit.Pixel, ia);
+            }
+
+            bmp.DrawInConsole();
+
+            return bmp;
+        }
+
         public static Bitmap Rotate(this Bitmap sourceBitmap, float angle)
         {
             Bitmap returnBitmap = new Bitmap(sourceBitmap.Width, sourceBitmap.Height);
@@ -64,7 +117,7 @@ namespace SymbolRecognitionLib
 
         public static Bitmap Scale(this Bitmap sourceBitmap, float xFactor, float yFactor)
         {
-            Bitmap returnBitmap = new Bitmap((int)(sourceBitmap.Width*xFactor), (int)(sourceBitmap.Height*yFactor));
+            Bitmap returnBitmap = new Bitmap((int)(sourceBitmap.Width * xFactor), (int)(sourceBitmap.Height * yFactor));
             returnBitmap.SetResolution(sourceBitmap.HorizontalResolution, sourceBitmap.VerticalResolution);
 
             using (var brush = new SolidBrush(Color.White))

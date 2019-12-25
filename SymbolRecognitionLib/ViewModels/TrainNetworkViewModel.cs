@@ -80,7 +80,7 @@ namespace SymbolRecognitionLib.ViewModels
         Regex onlyIntegers = new Regex(@"^\d+$");
         Regex onlyNumbers = new Regex(@"^\d+(?:\,\d+)?$");
 
-        private int? trainingDataCount = 0;
+        private int? trainingDataCount = null;
         public string TrainingDataCount
         {
             get { return trainingDataCount == null ? "All" : trainingDataCount.ToString(); }
@@ -97,7 +97,7 @@ namespace SymbolRecognitionLib.ViewModels
             }
         }
 
-        private int? testingDataCount = 0;
+        private int? testingDataCount = null;
         public string TestingDataCount
         {
             get { return testingDataCount == null ? "All" : testingDataCount.ToString(); }
@@ -114,7 +114,7 @@ namespace SymbolRecognitionLib.ViewModels
             }
         }
 
-        private float learningRate = 0.0F;
+        private float learningRate = 1;
         public string LearningRate
         {
             get { return learningRate.ToString(); }
@@ -129,7 +129,7 @@ namespace SymbolRecognitionLib.ViewModels
             }
         }
 
-        private int generations = 0;
+        private int generations = 3;
         public string Generations
         {
             get { return generations.ToString(); }
@@ -145,7 +145,7 @@ namespace SymbolRecognitionLib.ViewModels
             }
         }
 
-        private int miniBatchSize = 0;
+        private int miniBatchSize = 5;
         public string MiniBatchSize
         {
             get { return miniBatchSize.ToString(); }
@@ -154,7 +154,10 @@ namespace SymbolRecognitionLib.ViewModels
                 if (onlyIntegers.IsMatch(value))
                     miniBatchSize = int.Parse(value);
                 else
-                    miniBatchSize = 0;
+                    miniBatchSize = 5;
+
+                if (miniBatchSize == 0)
+                    miniBatchSize = 5;
 
                 OnPropertyChanged(nameof(MiniBatchSize));
             }
@@ -405,7 +408,7 @@ namespace SymbolRecognitionLib.ViewModels
 
         void chooseTestingLabel(object obj)
         {
-            string filePath = FileManager.OpenFileDialog("Mnist Dataset (*.mnist*)|*.mnist*|User Dataset (*.ninp*)|*.ninp*", @"C:\work\C#\Neural Network\NeuralNetwork");
+            string filePath = FileManager.OpenFileDialog("Mnist Dataset (*.mnist*)|*.mnist*|User Dataset (*.nlabl*)|*.nlabl*", @"C:\work\C#\Neural Network\NeuralNetwork");
 
             if (string.IsNullOrEmpty(filePath))
                 return;

@@ -9,38 +9,70 @@ namespace SymbolRecognitionLib
 {
     static class BitmapExtension
     {
-        public static void DrawInConsole(this Bitmap bitmap)
+        public static void DrawInConsole(this Bitmap bitmap, int? minx = null, int? miny = null, int? maxx = null, int? maxy = null, Point point = null)
         {
-            for (int row = 0; row < bitmap.Height; row++)
+            int height = maxy ?? bitmap.Height;
+            int width = maxx ?? bitmap.Width;
+
+            height = height > bitmap.Height ? bitmap.Height : height;
+            width = width > bitmap.Width ? bitmap.Width : width;
+
+            int initHeight = miny ?? 0;
+            int initWidth = minx ?? 0;
+
+            initHeight = initHeight < 0 ? 0 : initHeight;
+            initWidth = initWidth < 0 ? 0 : initWidth;
+
+            for (int row = initHeight; row < height; row++)
             {
-                for (int col = 0; col < bitmap.Width; col++)
+                for (int col = initWidth; col < width; col++)
                 {
-                    Console.Write(Math.Floor(bitmap.GetPixel(col, row).GetBrightness()));
+                    if (point != null && point.X == col && point.Y == row)
+                        Console.Write("+");
+                    else
+                        Console.Write(Math.Floor((decimal)(bitmap.GetPixel(col, row).GetBrightness())));
                 }
 
                 Console.WriteLine();
             }
         }
 
-        public static void DrawInConsole(this Bitmap bitmap, List<Rectangle> borderBoxes)
+        public static void DrawInConsole(this Bitmap bitmap, List<Rectangle> borderBoxes, int? minx = null, int? miny = null, int? maxx = null, int? maxy = null, Point point = null)
         {
-            for (int row = 0; row < bitmap.Height; row++)
+            int height = maxy ?? bitmap.Height;
+            int width = maxx ?? bitmap.Width;
+
+            height = height > bitmap.Height ? bitmap.Height : height;
+            width = width > bitmap.Width ? bitmap.Width : width;
+
+            int initHeight = miny ?? 0;
+            int initWidth = minx ?? 0;
+
+            initHeight = initHeight < 0 ? 0 : initHeight;
+            initWidth = initWidth < 0 ? 0 : initWidth;
+
+            for (int row = initHeight; row < height; row++)
             {
-                for (int col = 0; col < bitmap.Width; col++)
+                for (int col = initWidth; col < width; col++)
                 {
                     bool isBorder = false;
 
-                    foreach (var shape in borderBoxes)
-                        if (shape.IsPointBelongsBorder(new Point(col, row)))
-                        {
-                            Console.Write("*");
-                            isBorder = true;
-                            break;
-                        }
 
-                    if (!isBorder)
-                        Console.Write(Math.Floor(bitmap.GetPixel(col, row).GetBrightness()));
+                    if (point != null && point.X == col && point.Y == row)
+                        Console.Write("+");
+                    else
+                    {
+                        foreach (var shape in borderBoxes)
+                            if (shape.IsPointBelongsBorder(new Point(col, row)))
+                            {
+                                Console.Write("*");
+                                isBorder = true;
+                                break;
+                            }
 
+                        if (!isBorder)
+                            Console.Write(Math.Floor(bitmap.GetPixel(col, row).GetBrightness()));
+                    }
 
                 }
 
@@ -51,10 +83,10 @@ namespace SymbolRecognitionLib
 
     public class Point
     {
-        public int X;
-        public int Y;
+        public double X;
+        public double Y;
 
-        public Point(int x, int y)
+        public Point(double x, double y)
         {
             X = x;
             Y = y;
@@ -64,6 +96,21 @@ namespace SymbolRecognitionLib
         {
             X = point.X;
             Y = point.Y;
+        }
+
+        public static Point operator + (Point first, Point second)
+        {
+            return new Point(first.X + second.X, first.Y + second.Y);
+        }
+
+        public static Point operator -(Point first, Point second)
+        {
+            return new Point(first.X - second.X, first.Y - second.Y);
+        }
+
+        public static Point operator / (Point first, int scaler)
+        {
+            return new Point(first.X / scaler, first.Y / scaler);
         }
 
         public override bool Equals(object obj)
@@ -81,25 +128,30 @@ namespace SymbolRecognitionLib
 
         public override int GetHashCode()
         {
-            return X + Y;
+            return (int)(X + Y);
+        }
+
+        public override string ToString()
+        {
+            return $"({X}:{Y})";
         }
     }
 
-    class Rectangle
+    public class Rectangle
     {
         public Point TopLeftCorner { get; private set; } = null;
         public Point BottomRightCorner { get; private set; } = null;
 
-        public int Width => BottomRightCorner.X - TopLeftCorner.X + 1;
-        public int Height => BottomRightCorner.Y - TopLeftCorner.Y + 1;
+        public int Width => (int)(BottomRightCorner.X - TopLeftCorner.X + 1);
+        public int Height => (int)(BottomRightCorner.Y - TopLeftCorner.Y + 1);
         public Point Location => TopLeftCorner;
 
         HashSet<Point> points = new HashSet<Point>();
 
         public Rectangle(Point topLeftCorner, Point bottomRightCorner)
         {
-            TopLeftCorner = topLeftCorner;
-            BottomRightCorner = bottomRightCorner;
+            TopLeftCorner = new Point(topLeftCorner);
+            BottomRightCorner = new Point(bottomRightCorner);
 
             points.Add(topLeftCorner);
             points.Add(bottomRightCorner);
@@ -154,9 +206,9 @@ namespace SymbolRecognitionLib
             points.Add(point);
 
             if (TopLeftCorner == null)
-                TopLeftCorner = point;
+                TopLeftCorner = new Point(point);
             else if (BottomRightCorner == null)
-                BottomRightCorner = point;
+                BottomRightCorner = new Point(point);
             else if (!IsPointBelongsShape(point))
             {
                 TopLeftCorner.X = Math.Min(point.X, TopLeftCorner.X);
@@ -170,6 +222,7 @@ namespace SymbolRecognitionLib
         {
             Extend(other.TopLeftCorner);
             Extend(other.BottomRightCorner);
+            points.UnionWith(other.points);
         }
     }
 
@@ -207,11 +260,14 @@ namespace SymbolRecognitionLib
 
             while (advanceIfPossible())
             {
+
                 if (isFilledPixel)
                     processShape();
                 else
                     currentShape = null;
             }
+
+            excludeSmallShapes();
 
             return shapes;
         }
@@ -220,6 +276,7 @@ namespace SymbolRecognitionLib
 
         void processShape()
         {
+
             if (isPixelPartOfShape)
             {
                 var rect = findPointOwner();
@@ -247,54 +304,9 @@ namespace SymbolRecognitionLib
             foreach (var rect in shapes)
                 if (rect.IsContainsPoint(point))
                     return rect;
-                else if (rect.IsPointBelongsShape(point))
-                    return rect;
-
 
             return null;
         }
-
-        #region Helpers
-
-        Color getPixel()
-        {
-            return workingBitmap.GetPixel(Column, Row);
-        }
-
-        Color getPixel(Point point)
-        {
-            return workingBitmap.GetPixel(point.X, point.Y);
-        }
-
-        Bitmap copyOriginalBitmap()
-        {
-            return new Bitmap((Image)originalBitmap.Clone());
-        }
-
-        Point getPoint()
-        {
-            var point = new Point(Column, Row);
-            markPixel(point);
-            return point;
-        }
-
-        Point getPointBelow()
-        {
-            int row = Row + 1;
-
-            if (row >= originalBitmap.Height)
-                return null;
-
-            var point = new Point(Column, row);
-            return point;
-        }
-
-        void markPixel(Point point)
-        {
-            workingBitmap.SetPixel(point.X, point.Y, Color.FromArgb(0, 0, 0, 0));
-        }
-
-        #endregion
 
         void addPixelBelow()
         {
@@ -325,13 +337,65 @@ namespace SymbolRecognitionLib
             var rect = new Rectangle(point, new Point(point));
             shapes.Add(rect);
             currentShape = rect;
-
         }
 
         void extendShape(Point point)
         {
             currentShape.Extend(point);
         }
+
+        void excludeSmallShapes(int minnimalPossibleArea = 100)
+        {
+            var newShapes = new List<Rectangle>();
+
+            foreach (var shape in shapes)
+                if (shape.Width * shape.Height > minnimalPossibleArea)
+                    newShapes.Add(shape);
+
+            shapes = newShapes;
+        }
+
+        #region Helpers
+
+        Color getPixel()
+        {
+            return workingBitmap.GetPixel(Column, Row);
+        }
+
+        Color getPixel(Point point)
+        {
+            return workingBitmap.GetPixel((int)point.X, (int)point.Y);
+        }
+
+        Bitmap copyOriginalBitmap()
+        {
+            return new Bitmap((Image)originalBitmap.Clone());
+        }
+
+        Point getPoint()
+        {
+            var point = new Point(Column, Row);
+            markPixel(point);
+            return point;
+        }
+
+        Point getPointBelow()
+        {
+            int row = Row + 1;
+
+            if (row >= originalBitmap.Height)
+                return null;
+
+            var point = new Point(Column, row);
+            return point;
+        }
+
+        void markPixel(Point point)
+        {
+            workingBitmap.SetPixel((int)point.X, (int)point.Y, Color.FromArgb(0, 0, 0, 0));
+        }
+
+        #endregion
 
         /// <summary>
         /// Push cursor to the next pixel, returns false if reaches the end

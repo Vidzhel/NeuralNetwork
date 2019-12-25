@@ -1,17 +1,27 @@
-﻿using NeuralNetworkLib;
-using SymbolRecognitionLib.InversionOfControl;
-using SymbolsRecognitionLib;
+﻿using SymbolRecognitionLib.InversionOfControl;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.IO;
+using System.Linq;
+using System.Numerics;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Ink;
 using System.Windows.Media.Imaging;
 
 namespace SymbolRecognitionLib.ViewModels
 {
+    public enum FormattingMode
+    {
+        Append,
+        CreateNew
+    }
+
     public class SymbolsRecognitionViewModel : BaseViewModel
     {
         #region Bindnded Data
@@ -19,12 +29,16 @@ namespace SymbolRecognitionLib.ViewModels
         public Command ProcessUserInput { get; private set; }
         public Command ClearCanvas { get; private set; }
         public Command OnCanvasLoaded { get; private set; }
+        public Command OnOutputBoxLoaded { get; private set; }
         public Command ChangeBrush { get; private set; }
         public Command SaveLabeledData { get; private set; }
+        public Command ClearLabeledData { get; private set; }
 
+        RichTextBox outputTextBox;
         InkCanvas canvas;
         DrawingAttributes brush;
-        public DrawingAttributes Brush {
+        public DrawingAttributes Brush
+        {
             get
             {
                 return brush;
@@ -36,17 +50,18 @@ namespace SymbolRecognitionLib.ViewModels
             }
         }
 
-        string output;
-        public string Output {
+        bool isProcessing;
+        public bool IsProcessing
+        {
             get
             {
-                return output;
+                return isProcessing;
             }
 
             set
             {
-                output = value;
-                OnPropertyChanged(nameof(Output));
+                isProcessing = value;
+                OnPropertyChanged(nameof(IsProcessing));
             }
         }
 
@@ -129,7 +144,6 @@ namespace SymbolRecognitionLib.ViewModels
             }
         }
 
-
         string labeledDataCount = "0";
         public string LabeledDataCount
         {
@@ -146,8 +160,8 @@ namespace SymbolRecognitionLib.ViewModels
         }
         #endregion
 
-        List<double[][]> userTrainingData = new List<double[][]>();
-        List<double[][]> userLabeldResults = new List<double[][]>();
+        List<double[]> userTrainingData = new List<double[]>();
+        List<double[]> userLabeldResults = new List<double[]>();
 
         public SymbolsRecognitionViewModel()
         {
@@ -155,7 +169,9 @@ namespace SymbolRecognitionLib.ViewModels
             ProcessUserInput = new Command(processUserInput);
             ClearCanvas = new Command(clearCanvas);
             OnCanvasLoaded = new Command(onCanvasLoaded);
+            OnOutputBoxLoaded = new Command(onOutputBoxLoaded);
             SaveLabeledData = new Command(saveLabeledData);
+            ClearLabeledData = new Command(clearLabeledData);
 
             double[][] trainingInputs;
             double[][] testingInputs;
@@ -165,7 +181,10 @@ namespace SymbolRecognitionLib.ViewModels
             MNISTDataLoader.PrepeareData("..//..//..//MNISTDataset", out trainingInputs, out testingInputs, out trainingLabels, out testingLabels, 10, 10);
             foreach (var img in trainingInputs)
             {
-                MNISTDataLoader.ConvertImageToBitmap(img).DrawInConsole();
+                var bmp = MNISTDataLoader.ConvertImageToBitmap(img);
+                Console.WriteLine(GetMassCenterOffset(bmp));
+                bmp.DrawInConsole();
+
             }
         }
 
@@ -175,25 +194,46 @@ namespace SymbolRecognitionLib.ViewModels
 
         void processUserInput(object obj)
         {
-            Output = "";
-            Bitmap canvas = renderCanvasToBitmap();
+            if (isProcessing)
+                return;
 
-            var locator = new SymbolsLocator(canvas);
-            var borderBoxes = locator.Process();
+            Task.Run(() =>
+            {
+                try
+                {
+                    IsProcessing = true;
 
-            if (showBorderBoxes)
-                drawBorderBoxes(borderBoxes);
+                    formatTextOutput("", System.Windows.Media.Brushes.White, FormattingMode.CreateNew);
 
-            Bitmap[] symbols = extractSymbols(canvas, borderBoxes);
+                    Bitmap canvas = renderCanvasToBitmap();
 
-            if (classifyResults)
-                labelResults(symbols);
+                    var locator = new SymbolsLocator(canvas);
+                    var borderBoxes = locator.Process();
 
-            symbols = compressShapes(symbols);
-            double[][] inputs = convertToNeuralNetworkInputs(symbols);
+                    if (showBorderBoxes)
+                        drawBorderBoxes(borderBoxes);
 
-            double[][] outputs = ApplicationService.GetNeuralNetwork.Evaluate(inputs);
-            processOutputs(outputs);
+                    Bitmap[] symbols = extractSymbols(canvas, borderBoxes);
+
+                    if (classifyResults)
+                        labelResults(symbols);
+
+                    symbols = resizeShapes(symbols);
+
+                    foreach (var item in symbols)
+                    {
+                        item.DrawInConsole();
+                    }
+                    double[][] inputs = convertToNeuralNetworkInputs(symbols);
+
+                    double[][] outputs = ApplicationService.GetNeuralNetwork.Evaluate(inputs);
+                    processOutputs(outputs);
+                }
+                finally
+                {
+                    IsProcessing = false;
+                }
+            });
         }
 
         Bitmap renderCanvasToBitmap()
@@ -201,23 +241,30 @@ namespace SymbolRecognitionLib.ViewModels
             int height = (int)canvas.ActualHeight - 2;
             int width = (int)canvas.ActualWidth - 2;
 
-            RenderTargetBitmap renderer = new RenderTargetBitmap(width, height, 96.0, 96.0, System.Windows.Media.PixelFormats.Default);
-
-            renderer.Render(canvas);
-            Bitmap canvasBmp;
-
-            using (MemoryStream stream = new MemoryStream())
+            return Application.Current.Dispatcher.Invoke(() =>
             {
-                BitmapEncoder encoder = new BmpBitmapEncoder();
-                encoder.Frames.Add(BitmapFrame.Create(renderer));
-                encoder.Save(stream);
+                RenderTargetBitmap renderer = new RenderTargetBitmap(width, height, 96.0, 96.0, System.Windows.Media.PixelFormats.Default);
 
-                canvasBmp = new Bitmap(stream);
-                // Because the stream bitmap exists only when the stream is open, we copy the bitmap in order to safely close the stream
-                canvasBmp = new Bitmap(canvasBmp);
-            }
+                renderer.Render(canvas);
 
-            return canvasBmp;
+                Bitmap canvasBmp;
+
+
+                using (MemoryStream stream = new MemoryStream())
+                {
+                    BitmapEncoder encoder = new BmpBitmapEncoder();
+                    encoder.Frames.Add(BitmapFrame.Create(renderer));
+                    encoder.Save(stream);
+
+                    canvasBmp = new Bitmap(stream);
+                    // Because the stream bitmap exists only when the stream is open, we copy the bitmap in order to safely close the stream
+                    canvasBmp = new Bitmap(canvasBmp);
+                }
+
+                return canvasBmp;
+
+            });
+
         }
 
         void drawBorderBoxes(List<Rectangle> borderBoxes)
@@ -267,7 +314,10 @@ namespace SymbolRecognitionLib.ViewModels
                 strokes.Add(rightStroke);
             }
 
-            canvas.Strokes.Add(strokes);
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                canvas.Strokes.Add(strokes);
+            });
         }
 
         /// <summary>
@@ -284,15 +334,13 @@ namespace SymbolRecognitionLib.ViewModels
             {
                 var shape = borderBoxes[i];
 
-                int scrXPosition = shape.TopLeftCorner.X;
-                int scrYPosition = shape.TopLeftCorner.Y;
+                int scrXPosition = (int)shape.TopLeftCorner.X;
+                int scrYPosition = (int)shape.TopLeftCorner.Y;
 
                 var symbolBmp = new Bitmap(shape.Width, shape.Height);
 
                 using (var gr = Graphics.FromImage(symbolBmp))
-                using (var brush = new SolidBrush(Color.White))
                 {
-                    gr.FillRectangle(brush, 0, 0, shape.Width, shape.Height);
                     gr.DrawImage(sourceImage, new System.Drawing.Rectangle(0, 0, shape.Width, shape.Height), new System.Drawing.Rectangle(scrXPosition, scrYPosition, shape.Width, shape.Height), GraphicsUnit.Pixel);
                 }
 
@@ -302,28 +350,57 @@ namespace SymbolRecognitionLib.ViewModels
             return symbols;
         }
 
-        Bitmap[] compressShapes(Bitmap[] symbols, int padding = 3)
+        Bitmap[] resizeShapes(Bitmap[] symbols)
         {
             for (int symbol = 0; symbol < symbols.Length; symbol++)
             {
-                symbols[symbol] = ((Bitmap)symbols[symbol].GetThumbnailImage(28 - padding*2, 28 - padding*2, null, IntPtr.Zero)).AddPadding(padding, padding);
+                var symbol2020 = symbols[symbol].CropToSize(20, 20);
+                symbol2020.DrawInConsole();
+                var centroid = GetMassCenterOffset(symbol2020);
+
+                var bmp2828 = new Bitmap(28, 28);
+
+                using (var brush = new SolidBrush(Color.White))
+                using (var gfx2828 = Graphics.FromImage(bmp2828))
+                {
+                    gfx2828.FillRectangle(brush, 0, 0, bmp2828.Width, bmp2828.Height);
+                    gfx2828.DrawImage(symbol2020, 4 - (int)centroid.X, 4 - (int)centroid.Y);
+                }
+
+                symbols[symbol] = bmp2828;
             }
 
             return symbols;
         }
 
-        void labelResults(Bitmap[] symbols, float angle = 15, int offset = 10, float scaleFactor = 2)
+        public Point GetMassCenterOffset(Bitmap bitmap)
         {
-            if (string.IsNullOrEmpty(expectedResults) || ( expectedResults.Length != symbols.Length && expectedResults.Length != 1))
+            var path = new List<Vector2>();
+            for (int y = 0; y < bitmap.Height; y++)
+            {
+                for (int x = 0; x < bitmap.Width; x++)
+                {
+                    var brightness = bitmap.GetPixel(x, y).GetBrightness();
+                    if (brightness < 1)
+                        path.Add(new Vector2(x, y));
+                }
+            }
+            var centroid = path.Aggregate(Vector2.Zero, (current, point) => current + point) / path.Count();
+
+            return new Point((int)centroid.X - bitmap.Width / 2, (int)centroid.Y - bitmap.Height / 2);
+        }
+
+        void labelResults(Bitmap[] symbols, float angle = 15, int offset = 10, float scaleFactor = 1.4F)
+        {
+            if (string.IsNullOrEmpty(expectedResults) || (expectedResults.Length != symbols.Length && expectedResults.Length != 1))
             {
                 ExpectedResults = "";
                 return;
             }
-                
 
             for (int i = 0; i < symbols.Length; i++)
             {
-                List<Bitmap> trainingData = new List<Bitmap>(42);
+                List<Bitmap> trainingData = new List<Bitmap>(45);
                 var symbol = symbols[i].AddPadding(8, 8);
 
                 trainingData.Add(symbol);
@@ -338,8 +415,10 @@ namespace SymbolRecognitionLib.ViewModels
                 addDistortions(rotatedRight, ref trainingData, offset, scaleFactor);
                 addDistortions(rotatedLeft, ref trainingData, offset, scaleFactor);
 
-                Bitmap[] compressedTrainingData = compressShapes(trainingData.ToArray());
-                userTrainingData.Add(convertToNeuralNetworkInputs(compressedTrainingData));
+                Bitmap[] compressedTrainingData = resizeShapes(trainingData.ToArray());
+
+                foreach (var item in convertToNeuralNetworkInputs(compressedTrainingData))
+                    userTrainingData.Add(item);
 
                 foreach (var item in compressedTrainingData)
                 {
@@ -361,8 +440,10 @@ namespace SymbolRecognitionLib.ViewModels
             {
                 expectedOutputs = convertToNeuralNetworkOutput(new int[] { expectedResults[0] }, 45 * symbols.Length);
             }
-            TODO check user labels
-            userLabeldResults.Add(expectedOutputs);
+            // TODO check user labels
+
+            foreach (var item in expectedOutputs)
+                userLabeldResults.Add(item);
 
             ExpectedResults = "";
             clearCanvas(null);
@@ -409,7 +490,6 @@ namespace SymbolRecognitionLib.ViewModels
             for (int i = 0; i < symbols.Length; i++)
             {
                 var symbol = symbols[i];
-                //symbol.DrawInConsole();
 
                 double[] input = new double[28 * 28];
 
@@ -417,13 +497,12 @@ namespace SymbolRecognitionLib.ViewModels
                     for (int col = 0; col < symbol.Width; col++)
                     {
                         int pixel = row * 28 + col;
-                        double pixelBrightness = symbol.GetPixel(col, row).GetBrightness();
-
-                        // Inverse all white pixels to black
-                        // Convert to appropriate format (0 - white, 2.55 - black)
-                        input[pixel] = pixelBrightness == 1 ? 0 : (1 - pixelBrightness) * 2.55;
+                        double brightness = symbol.GetPixel(col, row).GetBrightness();
+                        // Invert and convert to neural network input (0, 2.55) where 0 white, 1 black
+                        brightness = (1 - brightness) * 2.55;
+                        input[pixel] = brightness;
                     }
-                
+
                 inputs[i] = input;
             }
 
@@ -432,6 +511,8 @@ namespace SymbolRecognitionLib.ViewModels
 
         void processOutputs(double[][] outputs)
         {
+            System.Windows.Media.Brush brush;
+
             foreach (var output in outputs)
             {
                 double maxVal = double.MinValue;
@@ -444,23 +525,49 @@ namespace SymbolRecognitionLib.ViewModels
                         resultNum = value;
                     }
 
-                Output += resultNum;
+                if (maxVal > 0.8)
+                    brush = System.Windows.Media.Brushes.Green;
+                else
+                    brush = System.Windows.Media.Brushes.Red;
+
+                formatTextOutput(resultNum.ToString(), brush, FormattingMode.Append);
             }
         }
-        
+
+        void formatTextOutput(string text, System.Windows.Media.Brush brush, FormattingMode mode)
+        {
+            TextRange rangeOfWord;
+
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                if (mode == FormattingMode.Append)
+                    rangeOfWord = new TextRange(outputTextBox.Document.ContentEnd, outputTextBox.Document.ContentEnd);
+                else
+                {
+                    outputTextBox.SelectAll();
+                    outputTextBox.Selection.Text = "";
+                    rangeOfWord = new TextRange(outputTextBox.Document.ContentStart, outputTextBox.Document.ContentStart);
+                }
+
+                rangeOfWord.Text = text;
+                rangeOfWord.ApplyPropertyValue(TextElement.ForegroundProperty, brush);
+            });
+
+        }
+
         double[][] convertToNeuralNetworkOutput(int[] num, int repetitions)
         {
             double[][] outputs = new double[num.Length * repetitions][];
 
             for (int i = 0; i < num.Length; i++)
             {
-                double[] output = new double[ApplicationService.GetNeuralNetwork.Layers[0].InputsCount];
+                double[] output = new double[ApplicationService.GetNeuralNetwork.Layers.Last().OutputsCount];
 
                 output[num[i]] = 1;
 
                 for (int j = 0; j < repetitions; j++)
                 {
-                    outputs[i*repetitions + j] = output;
+                    outputs[i * repetitions + j] = output;
                 }
             }
 
@@ -470,13 +577,24 @@ namespace SymbolRecognitionLib.ViewModels
 
         void saveLabeledData(object obj)
         {
-            string filePath = FileManager.OpenSaveFileDialog();
+            string filePath = FileManager.OpenSaveFileDialog(initialDirectory: @"C:\work\C#\Neural Network\NeuralNetwork");
 
             if (string.IsNullOrEmpty(filePath))
                 return;
 
-            FileManager.SaveFile(userLabeldResults, filePath + ".nlabl");
-            FileManager.SaveFile(userTrainingData, filePath + ".ninp");
+            // Delete extensions
+            filePath = Regex.Replace(filePath, @"\.\w+", "");
+
+            FileManager.SaveFile(userLabeldResults.ToArray(), filePath + ".nlabl");
+            FileManager.SaveFile(userTrainingData.ToArray(), filePath + ".ninp");
+            clearLabeledData(null);
+        }
+
+        void clearLabeledData(object obj)
+        {
+            userLabeldResults = new List<double[]>();
+            userTrainingData = new List<double[]>();
+            LabeledDataCount = "0";
         }
 
         void clearCanvas(object obj)
@@ -488,6 +606,11 @@ namespace SymbolRecognitionLib.ViewModels
         {
             canvas = (InkCanvas)obj;
             changeBrush(null);
+        }
+
+        void onOutputBoxLoaded(object obj)
+        {
+            outputTextBox = (RichTextBox)obj;
         }
 
         void changeBrush(object obj)

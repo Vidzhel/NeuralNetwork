@@ -4,7 +4,7 @@ using System.Windows;
 
 namespace SymbolRecognitionLib.Converters
 {
-    public class BoolInverser : BaseValueConverter<BoolToVisibilityConverter>
+    public class BoolInverser : BaseValueConverter<BoolInverser>
     {
         public override object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
