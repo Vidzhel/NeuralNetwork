@@ -57,7 +57,7 @@ namespace SymbolRecognitionLib
             return filePath;
         }
 
-        public static MemoryStream Decompress(string filePath)
+        public static FileStream Decompress(string filePath)
         {
             FileInfo fileToDecompress = new FileInfo(filePath); 
 
@@ -66,7 +66,7 @@ namespace SymbolRecognitionLib
                 string currentFileName = fileToDecompress.FullName;
                 string newFileName = currentFileName.Remove(currentFileName.Length - fileToDecompress.Extension.Length);
 
-                MemoryStream decompressedFileStream = new MemoryStream();
+                FileStream decompressedFileStream = new FileStream(filePath + ".temp", FileMode.Create, FileAccess.ReadWrite);
 
                 using (GZipStream decompressionStream = new GZipStream(originalFileStream, CompressionMode.Decompress))
                 {

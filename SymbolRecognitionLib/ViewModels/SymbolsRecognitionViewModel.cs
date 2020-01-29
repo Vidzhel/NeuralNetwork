@@ -172,20 +172,6 @@ namespace SymbolRecognitionLib.ViewModels
             OnOutputBoxLoaded = new Command(onOutputBoxLoaded);
             SaveLabeledData = new Command(saveLabeledData);
             ClearLabeledData = new Command(clearLabeledData);
-
-            double[][] trainingInputs;
-            double[][] testingInputs;
-
-            double[][] trainingLabels;
-            double[][] testingLabels;
-            MNISTDataLoader.PrepeareData("..//..//..//MNISTDataset", out trainingInputs, out testingInputs, out trainingLabels, out testingLabels, 10, 10);
-            foreach (var img in trainingInputs)
-            {
-                var bmp = MNISTDataLoader.ConvertImageToBitmap(img);
-                Console.WriteLine(GetMassCenterOffset(bmp));
-                bmp.DrawInConsole();
-
-            }
         }
 
         #region Command handlers
@@ -214,6 +200,8 @@ namespace SymbolRecognitionLib.ViewModels
                         drawBorderBoxes(borderBoxes);
 
                     Bitmap[] symbols = extractSymbols(canvas, borderBoxes);
+
+                    symbols = clearSymbols(symbols, borderBoxes);
 
                     if (classifyResults)
                         labelResults(symbols);
@@ -350,12 +338,31 @@ namespace SymbolRecognitionLib.ViewModels
             return symbols;
         }
 
+        Bitmap[] clearSymbols(Bitmap[] symbols, List<Rectangle> borderBoxes)
+        {
+            for (int i = 0; i < symbols.Length; i++)
+            {
+                var symbol = symbols[i];
+                var shape = borderBoxes[i];
+
+                for (int row = 0; row < symbol.Height; row++)
+                {
+                    for (int col = 0; col < symbol.Width; col++)
+                    {
+                        if (!shape.IsContainsPoint(new Point(col, row) + shape.TopLeftCorner))
+                            symbol.SetPixel(col, row, Color.White);
+                    }
+                }
+            }
+
+            return symbols;
+        }
+
         Bitmap[] resizeShapes(Bitmap[] symbols)
         {
             for (int symbol = 0; symbol < symbols.Length; symbol++)
             {
                 var symbol2020 = symbols[symbol].CropToSize(20, 20);
-                symbol2020.DrawInConsole();
                 var centroid = GetMassCenterOffset(symbol2020);
 
                 var bmp2828 = new Bitmap(28, 28);
@@ -390,7 +397,7 @@ namespace SymbolRecognitionLib.ViewModels
             return new Point((int)centroid.X - bitmap.Width / 2, (int)centroid.Y - bitmap.Height / 2);
         }
 
-        void labelResults(Bitmap[] symbols, float angle = 15, int offset = 10, float scaleFactor = 1.4F)
+        void labelResults(Bitmap[] symbols, float angle = 15, int offset = 30, float scaleFactor = 1.6F)
         {
             if (string.IsNullOrEmpty(expectedResults) || (expectedResults.Length != symbols.Length && expectedResults.Length != 1))
             {
@@ -420,6 +427,11 @@ namespace SymbolRecognitionLib.ViewModels
                 foreach (var item in convertToNeuralNetworkInputs(compressedTrainingData))
                     userTrainingData.Add(item);
 
+                for (int j = 0; j < compressedTrainingData.Length; j++)
+                {
+                    compressedTrainingData[j].Save("images/image" + j +".jpeg");
+                }
+
                 foreach (var item in compressedTrainingData)
                 {
                     item.DrawInConsole();
@@ -440,13 +452,16 @@ namespace SymbolRecognitionLib.ViewModels
             {
                 expectedOutputs = convertToNeuralNetworkOutput(new int[] { expectedResults[0] }, 45 * symbols.Length);
             }
-            // TODO check user labels
 
             foreach (var item in expectedOutputs)
                 userLabeldResults.Add(item);
 
             ExpectedResults = "";
-            clearCanvas(null);
+
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                clearCanvas(null);
+            });
 
             LabeledDataCount = userTrainingData.Count.ToString();
         }
@@ -577,7 +592,7 @@ namespace SymbolRecognitionLib.ViewModels
 
         void saveLabeledData(object obj)
         {
-            string filePath = FileManager.OpenSaveFileDialog(initialDirectory: @"C:\work\C#\Neural Network\NeuralNetwork");
+            string filePath = FileManager.OpenSaveFileDialog(initialDirectory: @"C:\work\C#\Neural Network\NeuralNetwork2");
 
             if (string.IsNullOrEmpty(filePath))
                 return;

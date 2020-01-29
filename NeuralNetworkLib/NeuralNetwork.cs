@@ -34,7 +34,9 @@ namespace NeuralNetworkLib
         public int[] trainingDataOrder { get; private set; }
         public int miniBatchCount { get; private set; }
 
-        public TrainingData(double[][] trainingInputs, double[][] expectedTrainingOutputs, float learningRate, int generations, int miniBatchSize, CancellationToken token, double[][] testingInputs = null, double[][] expectedTestingOutputs = null, double regularizationFactor = 0.0,
+        public Function<double, double, double> CostFunctions;
+
+        public TrainingData(double[][] trainingInputs, double[][] expectedTrainingOutputs, float learningRate, int generations, int miniBatchSize, CancellationToken token, Function<double, double, double> costFunctions, double[][] testingInputs = null, double[][] expectedTestingOutputs = null, double regularizationFactor = 0.0,
             bool monitorTrainingDataCost = false, bool monitorTrainingDataAccuracy = false, bool monitorTestingDataCost = false, bool monitorTestingDataAccuracy = false, double accuracyTolerance = 0.01)
         {
             this.trainingInputs = trainingInputs;
@@ -54,6 +56,8 @@ namespace NeuralNetworkLib
             this.monitorTrainingDataAccuracy = monitorTrainingDataAccuracy;
             this.monitorTestingDataCost = monitorTestingDataCost;
             this.monitorTestingDataAccuracy = monitorTestingDataAccuracy;
+
+            CostFunctions = costFunctions;
 
             initData();
         }
@@ -81,8 +85,6 @@ namespace NeuralNetworkLib
         #region public Members
 
         public List<Layer> Layers;
-        public List<Layer> ReversedLayers;
-        public Function<double, double, double> CostFunction;
 
         #endregion
 
@@ -91,9 +93,8 @@ namespace NeuralNetworkLib
         /// <summary>
         /// Initialise a neural network with no layers
         /// </summary>
-        public NeuralNetwork(Function<double, double, double> costFunction)
+        public NeuralNetwork()
         {
-            CostFunction = costFunction;
             Layers = new List<Layer>();
         }
 
@@ -101,9 +102,8 @@ namespace NeuralNetworkLib
         /// Initializes a neural network and generates layers
         /// </summary>
         /// <param name="size">the list contsins a count of neurons on each layer that will be generated</param>
-        public NeuralNetwork(int[] size, Function<double, double, double> costFunction, Function<double, double> activationFunction)
+        public NeuralNetwork(int[] size, Function<double, double> activationFunction)
         {
-            CostFunction = costFunction;
             Layers = new List<Layer>();
 
             for (int layer = 0; layer < size.Length; layer++)
@@ -123,7 +123,6 @@ namespace NeuralNetworkLib
 
         public NeuralNetwork(NeuralNetwork net)
         {
-            CostFunction = net.CostFunction;
             Layers = new List<Layer>();
 
             foreach (var layer in net.Layers)
@@ -147,11 +146,13 @@ namespace NeuralNetworkLib
         /// <param name="regularizationFactor">controls the growth of the weights, the bigger factor, the closer weights will be to zero</param>
         /// <returns>Each iteration returns monitor data in the array with the size of 5, where values can be null in the case the monitor
         /// flags are set to false. Monitor data in the array follows the next order: generation, trainingDataCost, trainingDataAccuracy, testingDataCost, testingDataAccuracy</returns>
-        public IEnumerable<Dictionary<string, double>> Train(double[][] trainingInputs, double[][] expectedTrainingOutputs, float learningRate, int generations, int miniBatchSize, CancellationToken token, double[][] testingInputs = null, double[][] expectedTestingOutputs = null, double regularizationFactor = 0.0,
+        public IEnumerable<Dictionary<string, double>> Train(double[][] trainingInputs, double[][] expectedTrainingOutputs, float learningRate, int generations, int miniBatchSize, CancellationToken token, Function<double, double, double> costFunctions, double[][] testingInputs = null, double[][] expectedTestingOutputs = null, double regularizationFactor = 0.0,
             bool monitorTrainingDataCost = false, bool monitorTrainingDataAccuracy = false, bool monitorTestingDataCost = false, bool monitorTestingDataAccuracy = false, double accuracyTolerance = 0.01)
         {
+            checkLayers();
+
             token.ThrowIfCancellationRequested();
-            TrainingData trainingData = new TrainingData(trainingInputs, expectedTrainingOutputs, learningRate, generations, miniBatchSize, token, testingInputs, expectedTestingOutputs, regularizationFactor, monitorTrainingDataCost, monitorTrainingDataAccuracy, monitorTestingDataCost, monitorTestingDataAccuracy, accuracyTolerance);
+            TrainingData trainingData = new TrainingData(trainingInputs, expectedTrainingOutputs, learningRate, generations, miniBatchSize, token, costFunctions, testingInputs, expectedTestingOutputs, regularizationFactor, monitorTrainingDataCost, monitorTrainingDataAccuracy, monitorTestingDataCost, monitorTestingDataAccuracy, accuracyTolerance);
 
             for (int gen = 0; gen < generations; gen++)
             {
@@ -169,6 +170,8 @@ namespace NeuralNetworkLib
 
         public IEnumerable<Dictionary<string, double>> Train(TrainingData trainingData, CancellationToken token)
         {
+            checkLayers();
+
             token.ThrowIfCancellationRequested();
 
             for (int gen = 0; gen < trainingData.generations; gen++)
@@ -189,13 +192,13 @@ namespace NeuralNetworkLib
 
         Task<Dictionary<string, double>> trainGenerationAsync(TrainingData trainingData, CancellationToken? token = null)
         {
-               return Task.Run<Dictionary<string, double>>(() => trainGeneration(trainingData, token));
+            return Task.Run<Dictionary<string, double>>(() => trainGeneration(trainingData, token));
         }
 
         Dictionary<string, double> trainGeneration(TrainingData trainingData, CancellationToken? token = null)
         {
             try
-            { 
+            {
                 trainingData.ShaffleTrainingDataOrder();
 
                 // Process each train data in a batch and update neuron's weights and biases
@@ -209,7 +212,7 @@ namespace NeuralNetworkLib
 
                         token?.ThrowIfCancellationRequested();
 
-                        feedAndPropagate(trainingData, trainingSample);
+                        feedAndPropagate(trainingData, trainingSample, trainingData.CostFunctions);
 
                         token?.ThrowIfCancellationRequested();
                     }
@@ -227,14 +230,14 @@ namespace NeuralNetworkLib
             }
         }
 
-        void feedAndPropagate(TrainingData trainingData, int trainingSample)
+        void feedAndPropagate(TrainingData trainingData, int trainingSample, Function<double, double, double> costFunction)
         {
             double[] inputs = trainingData.trainingInputs[trainingData.trainingDataOrder[trainingSample]];
             double[] expectedOutputs = trainingData.expectedTrainingOutputs[trainingData.trainingDataOrder[trainingSample]];
 
             double[] actualOutputs = Evaluate(inputs);
 
-            backPropagation(expectedOutputs, actualOutputs);
+            backPropagation(expectedOutputs, actualOutputs, costFunction);
         }
 
         Dictionary<string, double> prepareMonitoringData(TrainingData trainingData, CancellationToken? token)
@@ -245,22 +248,22 @@ namespace NeuralNetworkLib
             token?.ThrowIfCancellationRequested();
 
             if (trainingData.monitorTrainingDataCost)
-                monitorData["trainingDataCost"] = GetCost(trainingData.trainingInputs, trainingData.expectedTrainingOutputs);
+                monitorData["trainingDataCost"] = getCost(trainingData.trainingInputs, trainingData.expectedTrainingOutputs, trainingData.CostFunctions);
 
             token?.ThrowIfCancellationRequested();
 
             if (trainingData.monitorTrainingDataAccuracy)
-                monitorData["trainingDataAccuracy"] = GetAccuracy(trainingData.trainingInputs, trainingData.expectedTrainingOutputs, trainingData.accuracyTolerance);
+                monitorData["trainingDataAccuracy"] = getAccuracy(trainingData.trainingInputs, trainingData.expectedTrainingOutputs, trainingData.accuracyTolerance);
 
             token?.ThrowIfCancellationRequested();
 
             if (trainingData.monitorTestingDataCost && trainingData.testingInputs != null && trainingData.expectedTestingOutputs != null)
-                monitorData["testingDataCost"] = GetCost(trainingData.testingInputs, trainingData.expectedTestingOutputs);
+                monitorData["testingDataCost"] = getCost(trainingData.testingInputs, trainingData.expectedTestingOutputs, trainingData.CostFunctions);
 
             token?.ThrowIfCancellationRequested();
 
             if (trainingData.monitorTestingDataAccuracy && trainingData.testingInputs != null && trainingData.expectedTestingOutputs != null)
-                monitorData["testingDataAccuracy"] = GetAccuracy(trainingData.testingInputs, trainingData.expectedTestingOutputs, trainingData.accuracyTolerance);
+                monitorData["testingDataAccuracy"] = getAccuracy(trainingData.testingInputs, trainingData.expectedTestingOutputs, trainingData.accuracyTolerance);
 
             token?.ThrowIfCancellationRequested();
 
@@ -276,21 +279,16 @@ namespace NeuralNetworkLib
             if (input.Length != Layers[0].InputsCount)
                 throw new Exception("Count of given inputs doesn't match the imput layer inputs count");
 
-            foreach (var layer in Layers)
-                input = layer.FeedForward(input);
-
-            return input;
+            return evaluate(input);
         }
 
         public double[][] Evaluate(double[][] inputs)
         {
+            checkLayers();
+            if (inputs.First().Length != Layers[0].InputsCount)
+                throw new Exception("Count of given inputs doesn't match the imput layer inputs count");
 
-            double[][] outputs = new double[inputs.Length][];
-
-            for (int input = 0; input < inputs.Length; input++)
-                outputs[input] = Evaluate(inputs[input]);
-
-            return outputs;
+            return evaluate(inputs);
         }
 
         public double GetAccuracy(double[][] inputs, double[][] expectedOutputs, double tolerance = 0.5)
@@ -308,22 +306,10 @@ namespace NeuralNetworkLib
             if (loops != expectedOutputs.GetLength(0))
                 throw new Exception("The size of inputs and expected outputs doesn't match");
 
-            double accuracy = 0;
-            double accuracyStep = 100.0 / (outputsCount * loops);
-
-            for (int i = 0; i < loops; i++)
-            {
-                double[] actualOutputs = Evaluate(inputs[i]);
-
-                for (int output = 0; output < outputsCount; output++)
-                    if (Math.Abs(actualOutputs[output] - expectedOutputs[i][output]) < tolerance)
-                        accuracy += accuracyStep;
-            }
-
-            return accuracy;
+            return getAccuracy(inputs, expectedOutputs, tolerance);
         }
 
-        public double GetCost(double[][] inputs, double[][] expectedOutputs)
+        public double GetCost(double[][] inputs, double[][] expectedOutputs, Function<double, double, double> costFunction)
         {
             int loops = inputs.GetLength(0);
             int inputsCount = inputs[0].Length;
@@ -338,15 +324,7 @@ namespace NeuralNetworkLib
             if (loops != expectedOutputs.GetLength(0))
                 throw new Exception("The size of inputs and expected outputs doesn't match");
 
-            double totalCost = 0;
-
-            for (int i = 0; i < loops; i++)
-            {
-                double[] actualOutputs = Evaluate(inputs[i]);
-                totalCost += calculateCost(expectedOutputs[i], actualOutputs);
-            }
-
-            return totalCost / loops;
+            return getCost(inputs, expectedOutputs, costFunction);
         }
 
         public void Save(string filePath)
@@ -360,7 +338,6 @@ namespace NeuralNetworkLib
 
         /// <exception cref="FileNotFoundException">Will be throwen if the file doesn't exist</exception>
         /// <exception cref="System.Runtime.Serialization.SerializationException">Will be throwen if the file data corrupted</exception>
-        /// <returns></returns>
         public static NeuralNetwork Load(string filePath)
         {
 
@@ -383,7 +360,7 @@ namespace NeuralNetworkLib
 
         #endregion
 
-        #region private methods
+        #region helpers
 
         /// <summary>
         /// Checks if a Neural Network has appropriate structures of layers
@@ -433,7 +410,64 @@ namespace NeuralNetworkLib
             return false;
         }
 
-        double calculateCost(double[] expectedRes, double[] actualRes)
+        #endregion
+
+        #region private methods
+
+        double[] evaluate(double[] input)
+        {
+            foreach (var layer in Layers)
+                input = layer.FeedForward(input);
+
+            return input;
+        }
+
+        double[][] evaluate(double[][] inputs)
+        {
+            double[][] outputs = new double[inputs.Length][];
+
+            for (int input = 0; input < inputs.Length; input++)
+                outputs[input] = evaluate(inputs[input]);
+
+            return outputs;
+        }
+
+        double getAccuracy(double[][] inputs, double[][] expectedOutputs, double tolerance = 0.5)
+        {
+            int loops = inputs.GetLength(0);
+            int outputsCount = expectedOutputs[0].Length;
+
+            double accuracy = 0;
+            double accuracyStep = 100.0 / (outputsCount * loops);
+
+            for (int i = 0; i < loops; i++)
+            {
+                double[] actualOutputs = Evaluate(inputs[i]);
+
+                for (int output = 0; output < outputsCount; output++)
+                    if (Math.Abs(actualOutputs[output] - expectedOutputs[i][output]) < tolerance)
+                        accuracy += accuracyStep;
+            }
+
+            return accuracy;
+        }
+
+        double getCost(double[][] inputs, double[][] expectedOutputs, Function<double, double, double> costFunction)
+        {
+            int loops = inputs.GetLength(0);
+
+            double totalCost = 0;
+
+            for (int i = 0; i < loops; i++)
+            {
+                double[] actualOutputs = Evaluate(inputs[i]);
+                totalCost += calculateCost(expectedOutputs[i], actualOutputs, costFunction);
+            }
+
+            return totalCost / loops;
+        }
+
+        double calculateCost(double[] expectedRes, double[] actualRes, Function<double, double, double> costFunction)
         {
             if (expectedRes.Length != actualRes.Length)
                 throw new Exception("Expected and actual values vectors should be the same length");
@@ -442,15 +476,15 @@ namespace NeuralNetworkLib
 
             for (int i = 0; i < expectedRes.Length; i++)
             {
-                cost += CostFunction.Func(expectedRes[i], actualRes[i]);
+                cost += costFunction.Func(expectedRes[i], actualRes[i]);
             }
 
             return cost;
         }
 
-        void backPropagation(double[] expectedRes, double[] actualRes)
+        void backPropagation(double[] expectedRes, double[] actualRes, Function<double, double, double> costFunction)
         {
-            double[] errors = calculateCostGradient(expectedRes, actualRes);
+            double[] errors = calculateCostGradient(expectedRes, actualRes, costFunction);
             double[] deltas = Layers.Last().BackPropagation(errors);
 
             for (int layer = Layers.Count - 2; layer > -1; layer--)
@@ -460,12 +494,12 @@ namespace NeuralNetworkLib
             }
         }
 
-        double[] calculateCostGradient(double[] expectedRes, double[] actualRes)
+        double[] calculateCostGradient(double[] expectedRes, double[] actualRes, Function<double, double, double> costFunction)
         {
             double[] gradient = new double[expectedRes.Length];
 
             for (int i = 0; i < expectedRes.Length; i++)
-                gradient[i] = CostFunction.DerivativeFunc(expectedRes[i], actualRes[i]);
+                gradient[i] = costFunction.DerivativeFunc(expectedRes[i], actualRes[i]);
 
             return gradient;
         }

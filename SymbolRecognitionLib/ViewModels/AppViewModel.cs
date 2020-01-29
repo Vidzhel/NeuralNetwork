@@ -6,6 +6,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Test;
 
 namespace SymbolRecognitionLib.ViewModels
 {
@@ -194,6 +195,8 @@ namespace SymbolRecognitionLib.ViewModels
 
         public AppViewModel()
         {
+            TestStream.Test();
+
             tabs.Add(new SymbolsRecognitionViewModel());
             tabs.Add(new TrainNetworkViewModel());
             CurrentViewModel = tabs[0];
@@ -236,21 +239,21 @@ namespace SymbolRecognitionLib.ViewModels
 
         void loadNeuralNetwork(object obj)
         {
-            string filePath = FileManager.OpenFileDialog(filter: "Neural Network (*.net)|*.net", @"C:\work\C#\Neural Network\NeuralNetwork", "Choose network to load");
+            string filePath = FileManager.OpenFileDialog(filter: "Neural Network (*.net)|*.net", @"C:\work\C#\Neural Network\NeuralNetwork2", "Choose network to load");
 
             if (!string.IsNullOrEmpty(filePath))
             {
                 NeuralNetwork = NeuralNetwork.Load(filePath);
                 LoadedNetworkName = Path.GetFileName(filePath);
                 IsNetworkLoaded = true;
+            loadNetworkInfo();
             }
 
-            loadNetworkInfo();
         }
 
         void saveNeuralNetwork(object obj)
         {
-            string filePath = FileManager.OpenSaveFileDialog(filter: "Neural Network (*.net)|*.net", @"C:\work\C#\Neural Network\NeuralNetwork");
+            string filePath = FileManager.OpenSaveFileDialog(filter: "Neural Network (*.net)|*.net", @"C:\work\C#\Neural Network\NeuralNetwork2");
 
             if (!string.IsNullOrEmpty(filePath))
             {
@@ -261,7 +264,7 @@ namespace SymbolRecognitionLib.ViewModels
 
         void createNeuralNetwork(object obj)
         {
-            NeuralNetwork = new NeuralNetwork(newNeuralNetworkTypology, CostFunctions[choseCostFunction], ActivationFunctions[choseActivationFunction]);
+            //NeuralNetwork = new NeuralNetwork(newNeuralNetworkTypology, CostFunctions[choseCostFunction], ActivationFunctions[choseActivationFunction]);
 
             IsNetworkLoaded = true;
             LoadedNetworkName = "new_nn.net";
@@ -295,7 +298,6 @@ namespace SymbolRecognitionLib.ViewModels
 
         void loadNetworkInfo()
         {
-            CostFuncitonName = NeuralNetwork.CostFunction.Name;
             ActivationFunctionName = NeuralNetwork.Layers.FirstOrDefault()?.Neurons.First().ActivationFunction.Name ?? "None";
 
             int[] typology = new int[NeuralNetwork.Layers.Count];

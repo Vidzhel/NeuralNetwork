@@ -238,10 +238,6 @@
                     </Grid>
                 </Grid>
             </TabItem>
-
-            <TabItem Header="Data Viewer" DataContext="{Binding CurrentViewModel}">
-                
-            </TabItem>
         </TabControl>
     </Grid>
 </Window>

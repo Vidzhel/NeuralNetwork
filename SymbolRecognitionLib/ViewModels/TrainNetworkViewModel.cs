@@ -372,7 +372,7 @@ namespace SymbolRecognitionLib.ViewModels
 
         void chooseTrainingInputs(object obj)
         {
-            string filePath = FileManager.OpenFileDialog("Mnist Dataset (*.mnist*)|*.mnist*|User Dataset (*.ninp*)|*.ninp*", @"C:\work\C#\Neural Network\NeuralNetwork");
+            string filePath = FileManager.OpenFileDialog("Mnist Dataset (*.mnist*)|*.mnist*|User Dataset (*.ninp*)|*.ninp*", @"C:\work\C#\Neural Network\NeuralNetwork2");
 
             if (string.IsNullOrEmpty(filePath))
                 return;
@@ -384,7 +384,7 @@ namespace SymbolRecognitionLib.ViewModels
 
         void chooseTrainingLabels(object obj)
         {
-            string filePath = FileManager.OpenFileDialog("Mnist Dataset (*.mnist*)|*.mnist*|User Dataset (*.nlabl*)|*.nlabl*", @"C:\work\C#\Neural Network\NeuralNetwork");
+            string filePath = FileManager.OpenFileDialog("Mnist Dataset (*.mnist*)|*.mnist*|User Dataset (*.nlabl*)|*.nlabl*", @"C:\work\C#\Neural Network\NeuralNetwork2");
 
             if (string.IsNullOrEmpty(filePath))
                 return;
@@ -396,7 +396,7 @@ namespace SymbolRecognitionLib.ViewModels
 
         void chooseTestingInputs(object obj)
         {
-            string filePath = FileManager.OpenFileDialog("Mnist Dataset (*.mnist*)|*.mnist*|User Dataset (*.ninp*)|*.ninp*", @"C:\work\C#\Neural Network\NeuralNetwork");
+            string filePath = FileManager.OpenFileDialog("Mnist Dataset (*.mnist*)|*.mnist*|User Dataset (*.ninp*)|*.ninp*", @"C:\work\C#\Neural Network\NeuralNetwork2");
 
             if (string.IsNullOrEmpty(filePath))
                 return;
@@ -408,7 +408,7 @@ namespace SymbolRecognitionLib.ViewModels
 
         void chooseTestingLabel(object obj)
         {
-            string filePath = FileManager.OpenFileDialog("Mnist Dataset (*.mnist*)|*.mnist*|User Dataset (*.nlabl*)|*.nlabl*", @"C:\work\C#\Neural Network\NeuralNetwork");
+            string filePath = FileManager.OpenFileDialog("Mnist Dataset (*.mnist*)|*.mnist*|User Dataset (*.nlabl*)|*.nlabl*", @"C:\work\C#\Neural Network\NeuralNetwork2");
 
             if (string.IsNullOrEmpty(filePath))
                 return;
@@ -434,7 +434,7 @@ namespace SymbolRecognitionLib.ViewModels
             }
 
             if (trainingInputsFilePath.Contains(".mnist"))
-                trainingInputs = MNISTDataLoader.ReadImages(trainingInputsFilePath, trainingDataCount);
+                trainingInputs = MNISTDataLoader.readImages(trainingInputsFilePath, trainingDataCount);
             else
             {
                 if (Path.GetExtension(trainingInputsFilePath) == ".gz")
@@ -476,7 +476,7 @@ namespace SymbolRecognitionLib.ViewModels
             }
 
             if (testingInputsFilePath.Contains(".mnist"))
-                testingInputs = MNISTDataLoader.ReadImages(testingInputsFilePath, testingDataCount);
+                testingInputs = MNISTDataLoader.readImages(testingInputsFilePath, testingDataCount);
             else
             {
                 if (Path.GetExtension(testingInputsFilePath) == ".gz")
@@ -584,7 +584,7 @@ namespace SymbolRecognitionLib.ViewModels
 
                     TrainingProgress = 5;
 
-                    foreach (var monitorData in ApplicationService.GetNeuralNetwork.Train(trainingInputs, trainingLabels, learningRate, generations, miniBatchSize, trainingCancellationToken, testingInputs, testingLabels, regularizationFactor, monitorTrainingCost, monitorTrainingAccuracy, monitorTestingCost, monitorTestingAccuracy, accuracyTolerance))
+                    foreach (var monitorData in ApplicationService.GetNeuralNetwork.Train(trainingInputs, trainingLabels, learningRate, generations, miniBatchSize, trainingCancellationToken, NeuralNetworkLib.Function<double, double, double>.CrossEntropy, testingInputs, testingLabels, regularizationFactor, monitorTrainingCost, monitorTrainingAccuracy, monitorTestingCost, monitorTestingAccuracy, accuracyTolerance))
                     {
                         populateGraphsWithData(monitorData);
                         TrainingProgress += progressStep;

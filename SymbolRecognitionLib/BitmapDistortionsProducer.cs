@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -23,6 +24,14 @@ namespace SymbolRecognitionLib
 
     public static class BitmapDistortionsProducer
     {
+
+        public static void Save(this Bitmap sourceBitmap, string path)
+        {
+            using (var fileStream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write))
+            {
+                sourceBitmap.Save(fileStream, ImageFormat.Jpeg);
+            }
+        }
 
         public static Bitmap FitSquare(this Bitmap sourceBitmap)
         {

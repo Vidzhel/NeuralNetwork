@@ -48,30 +48,47 @@ namespace SymbolRecognitionLib
             int initHeight = miny ?? 0;
             int initWidth = minx ?? 0;
 
-            initHeight = initHeight < 0 ? 0 : initHeight;
-            initWidth = initWidth < 0 ? 0 : initWidth;
-
             for (int row = initHeight; row < height; row++)
             {
                 for (int col = initWidth; col < width; col++)
                 {
                     bool isBorder = false;
+                    bool found = false;
 
 
                     if (point != null && point.X == col && point.Y == row)
                         Console.Write("+");
                     else
                     {
-                        foreach (var shape in borderBoxes)
-                            if (shape.IsPointBelongsBorder(new Point(col, row)))
-                            {
-                                Console.Write("*");
-                                isBorder = true;
-                                break;
-                            }
+                        //foreach (var shape in borderBoxes)
+                        //    if (shape.IsPointBelongsBorder(new Point(col, row)))
+                        //    {
+                        //        Console.Write("*");
+                        //        isBorder = true;
+                        //        break;
+                        //    }
 
                         if (!isBorder)
-                            Console.Write(Math.Floor(bitmap.GetPixel(col, row).GetBrightness()));
+                            if (bitmap.GetPixel(col, row).GetBrightness() < 0.6)
+                            {
+                                found = false;
+                                for (int i = 0; i < borderBoxes.Count; i++)
+                                {
+                                    if (borderBoxes[i].IsPointBelongsShape(new Point(col, row)))
+                                    {
+                                        Console.Write(i);
+                                        found = true;
+                                        break;
+                                    }
+                                }
+
+                                if (!found)
+                                    Console.Write("#");
+                            }
+                            else
+                            {
+                                Console.Write("-");
+                            }
                     }
 
                 }
@@ -81,7 +98,8 @@ namespace SymbolRecognitionLib
         }
     }
 
-    public class Point
+
+    public class Point : IComparable<Point>
     {
         public double X;
         public double Y;
@@ -98,7 +116,7 @@ namespace SymbolRecognitionLib
             Y = point.Y;
         }
 
-        public static Point operator + (Point first, Point second)
+        public static Point operator +(Point first, Point second)
         {
             return new Point(first.X + second.X, first.Y + second.Y);
         }
@@ -108,9 +126,37 @@ namespace SymbolRecognitionLib
             return new Point(first.X - second.X, first.Y - second.Y);
         }
 
-        public static Point operator / (Point first, int scaler)
+        public static Point operator /(Point first, int scaler)
         {
             return new Point(first.X / scaler, first.Y / scaler);
+        }
+
+        public static bool operator >(Point first, Point second)
+        {
+            double verticalThreshold = 50;
+
+            double vertical = first.Y - second.Y;
+            double horizontal = first.X - second.X;
+
+            if (Math.Abs(vertical) > verticalThreshold)
+            {
+                if (vertical > 0)
+                    return true;
+                else
+                    return false;
+            }
+            else
+            {
+                if (horizontal > 0)
+                    return true;
+                else
+                    return false;
+            }
+        }
+
+        public static bool operator <(Point first, Point second)
+        {
+            return !(first > second);
         }
 
         public override bool Equals(object obj)
@@ -134,6 +180,15 @@ namespace SymbolRecognitionLib
         public override string ToString()
         {
             return $"({X}:{Y})";
+        }
+
+        public int CompareTo(Point other)
+        {
+            if (this > other)
+                return 1;
+            else if (this == other)
+                return 0;
+            return -1;
         }
     }
 
@@ -243,7 +298,7 @@ namespace SymbolRecognitionLib
         Rectangle currentShape = null;
         List<Rectangle> shapes;
 
-        bool isFilledPixel => getPixel().GetBrightness() < 1;
+        bool isFilledPixel => getPixel().GetBrightness() < 0.6;
         bool isPixelPartOfShape => getPixel().A == 0;
 
         #endregion
@@ -269,13 +324,14 @@ namespace SymbolRecognitionLib
 
             excludeSmallShapes();
 
-            return shapes;
+            return shapes.OrderBy(shape => shape.TopLeftCorner).ToList();
         }
 
         #region Private methods
 
         void processShape()
         {
+            //originalBitmap.DrawInConsole(shapes, 5, 5, 100, 50, new Point(Column, Row)); 
 
             if (isPixelPartOfShape)
             {

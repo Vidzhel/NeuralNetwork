@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.IO.Compression;
@@ -6,54 +7,81 @@ using System.Linq;
 
 namespace SymbolRecognitionLib
 {
-    public static class MNISTDataLoader
+    public enum DataType
     {
-        public static void PrepeareData(string folderPath, out double[][] trainingImages, out double[][] testingImages, out double[][] trainLabels, out double[][] testLabels, int? testDataCount = null, int? trainDataCount = null)
+        Images,
+        Labels
+    }
+
+    public class MNISTDataLoader : DataLoader
+    {
+        int IMAGE_SIZE = 28 * 28;
+
+        public MNISTDataLoader(string filePath, DataType type) : base(filePath, type)
         {
-
-            double[] trainingLabels;
-            double[] testingLables;
-
-            LoadTrainData(folderPath, out trainingImages, out trainingLabels, trainDataCount);
-            LoadTestData(folderPath, out testingImages, out testingLables, testDataCount);
-
-            testLabels = ConvertLabels(testingLables);
-            trainLabels = ConvertLabels(trainingLabels);
-
         }
 
-        public static double[][] ConvertLabels(double[] labels)
+        public override IEnumerable<double[][]> LoadData(int bathSize, int start = 0, int count = -1)
+        {
+            if (type == DataType.Images)
+            {
+                double[][] buffer;
+
+                while (readImages(out buffer, bathSize, start) != 0 && count != 0)
+                {
+                    yield return buffer;
+
+                    start += bathSize;
+                    count--;
+                }
+            }
+            else
+            {
+                double[] buffer;
+
+                while (readLabels(out buffer, bathSize, start) != 0 && count != 0)
+                {
+                    yield return convertLabels(buffer);
+
+                    start += bathSize;
+                    count--;
+                }
+            }
+        }
+
+        public override double[][] LoadData(int start = 0)
+        {
+            if (type == DataType.Images)
+            {
+                double[][] buffer;
+
+                readImages(out buffer, start: start);
+
+                return buffer;
+            }
+            else
+            {
+                double[] buffer;
+
+                readLabels(out buffer, start: start);
+
+                return convertLabels(buffer);
+            }
+        }
+
+        internal virtual double[][] convertLabels(double[] labels, int outputsCount = 10)
         {
             double[][] convertedLabels = new double[labels.Length][];
 
             for (int label = 0; label < labels.Length; label++)
             {
-                double[] testingOutput = new double[10];
+                double[] testingOutput = new double[outputsCount];
                 testingOutput[(int)labels[label]]++;
 
                 convertedLabels[label] = testingOutput;
             }
 
             return convertedLabels;
-        }
-
-
-        public static void LoadTestData(string folderPath, out double[][] images, out double[] labels, int? count = null)
-        {
-            string testImages = folderPath + "//t10k-images-idx3-ubyte.mnist.gz";
-            string testLabels = folderPath + "/t10k-labels-idx1-ubyte.mnist.gz";
-
-            images = ReadImages(testImages, count);
-            labels = ReadLabels(testLabels, count);
-        }
-
-        public static void LoadTrainData(string folderPath, out double[][] images, out double[] labels, int? count = null)
-        {
-            string testImages = folderPath + "//train-images-idx3-ubyte.mnist.gz";
-            string testLabels = folderPath + "//train-labels-idx1-ubyte.mnist.gz";
-
-            images = ReadImages(testImages, count);
-            labels = ReadLabels(testLabels, count);
         }
 
         public static Bitmap ConvertImageToBitmap(double[] image)
@@ -64,36 +92,35 @@ namespace SymbolRecognitionLib
                 for (int col = 0; col < 28; col++)
                 {
                     int brightness = (int)(image[row * 28 + col] * 100);
-                    brightness = brightness == 0 ? 255 : brightness; 
+                    brightness = brightness == 0 ? 255 : brightness;
                     bmp.SetPixel(col, row, Color.FromArgb(brightness, brightness, brightness));
                 }
 
             return bmp;
         }
 
-        public static double[][] ReadImages(string filePath, int? count = null)
+        /// <summary>
+        /// Loads Mnist images
+        /// </summary>
+        int readImages(out double[][] buffer, int? count = null, int start = 0)
         {
-            Stream fileStream;
-
-            if (Path.GetExtension(filePath) == ".gz")
-                fileStream = FileManager.Decompress(filePath);
-            else
-                fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
-
-            double[][] images;
+            int imagesCount;
 
             try
             {
-                using (BinaryReader reader = new BinaryReader(fileStream))
+                using (BinaryReader reader = new BinaryReader(file))
                 {
                     reader.ReadBytes(4); // First four bytes are a magic number, we don't need it as we know the structure of the file (3 demensions, ubyte type of data)
 
-                    int imagesCount = BitConverter.ToInt32(reader.ReadBytes(4).Reverse().ToArray(), 0); // As the values incoded in big-endian, we need to reverse bytes
-                    imagesCount = count != null ? (int)count : imagesCount;
+                    imagesCount = BitConverter.ToInt32(reader.ReadBytes(4).Reverse().ToArray(), 0) - start; // As the values incoded in big-endian, we need to reverse bytes
+                    imagesCount = count != null && count > 0 && count < imagesCount ? (int)count : imagesCount;
+
                     int rowsCount = BitConverter.ToInt32(reader.ReadBytes(4).Reverse().ToArray(), 0);
                     int colsCount = BitConverter.ToInt32(reader.ReadBytes(4).Reverse().ToArray(), 0);
 
-                    images = new double[imagesCount][];
+                    file.Seek((start * IMAGE_SIZE) + 16, SeekOrigin.Begin);
+
+                    buffer = new double[imagesCount][];
 
                     for (int img = 0; img < imagesCount; img++)
                     {
@@ -105,54 +132,73 @@ namespace SymbolRecognitionLib
                             pixels[pixel] /= 100;
                         }
 
-                        images[img] = pixels;
+                        buffer[img] = pixels;
                     }
                 }
 
-                return images;
+                return imagesCount;
             }
-            finally
+            catch (EndOfStreamException e)
             {
-                fileStream.Close();
+                buffer = new double[0][];
+                return 0;
             }
         }
 
-        public static double[] ReadLabels(string filePath, int? count = null)
+        /// <summary>
+        /// Loads Emnist images
+        /// </summary>
+        /// <returns></returns>
+        //public static int ReadImagesAndFlip(string filePath, out double[][] buffer, int? count = null, int start = 0)
+        //{
+        //    var bitmaps = new List<Bitmap>();
+
+        //    var readCount = ReadImages(filePath, out buffer, count, start);
+
+        //    foreach (var img in buffer)
+        //    {
+        //        var bmp = ConvertImageToBitmap(img);
+        //        bmp.RotateFlip(RotateFlipType.Rotate270FlipY);
+        //        bitmaps.Add(bmp);
+        //    }
+
+        //    buffer = ConvertBitmapsToArray(bitmaps.ToArray());
+
+        //    return readCount;
+        //}
+
+        int readLabels(out double[] buffer, int? count = null, int start = 0)
         {
-            Stream fileStream;
-
-            if (Path.GetExtension(filePath) == ".gz")
-                fileStream = FileManager.Decompress(filePath);
-            else
-                fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
-
-            double[] labels;
+            int labelsCount;
 
             try
             {
-                using (BinaryReader reader = new BinaryReader(fileStream))
+                using (BinaryReader reader = new BinaryReader(file))
                 {
                     reader.ReadBytes(4); // First four bytes are a magic number, we don't need it as we know the structure of the file (3 demensions, ubyte type of data)
 
 
-                    int labelsCount = BitConverter.ToInt32(reader.ReadBytes(4).Reverse().ToArray(), 0); // As the values incoded in big-endian, we need to reverse bytes
-                    labelsCount = count != null ? (int)count : labelsCount;
+                    labelsCount = BitConverter.ToInt32(reader.ReadBytes(4).Reverse().ToArray(), 0) - start; // As the values incoded in big-endian, we need to reverse bytes
+                    labelsCount = count != null && count > 0 && count < labelsCount ? (int)count : labelsCount;
 
-                    labels = new double[labelsCount];
-                    labels = new double[labelsCount];
+                    file.Seek(start + 8, SeekOrigin.Begin);
+
+                    buffer = new double[labelsCount];
 
                     for (int label = 0; label < labelsCount; label++)
                     {
-                        labels[label] = reader.ReadByte();
+                        buffer[label] = reader.ReadByte();
                     }
                 }
 
-                return labels;
             }
-            finally
+            catch (EndOfStreamException e)
             {
-                fileStream.Close();
+                buffer = new double[0];
+                labelsCount = 0;
             }
+
+            return labelsCount;
         }
     }
 }
