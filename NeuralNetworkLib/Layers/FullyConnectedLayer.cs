@@ -5,96 +5,59 @@ namespace NeuralNetworkLib.Layers
 {
 
     [Serializable]
-    public class FullyConnectedLayer : Layer
+    public class FullyConnectedLayer : Layer<float>
     {
 
-        //#region public Members
-
-        //public Neuron[] Neurons { get; private set; }
-        //public int OutputsCount { get; private set; }
-        //public int InputsCount { get; private set; }
-        //public LayerType Type { get; private set; }
-        //public double[][] Weights { get; private set; }
-
-        //#endregion
-
-
-        public FullyConnectedLayer(int NeuronsCount, int InputsCount, LayerType layerType, Function<double, double> activationFunction)
+        public FullyConnectedLayer(Shape inputShape, LayerType type, Function<float, float> activationFunction)
+            : base(createNeurons(inputShape, type, activationFunction), new Shape(new int[] { inputShape[0] }), inputShape, type)
         {
-            Neurons = new Neuron[NeuronsCount];
-            Type = layerType;
-
-            for (int neuron = 0; neuron < Neurons.Length; neuron++)
-                Neurons[neuron] = new Neuron(InputsCount, layerType, activationFunction);
-
-            OutputsCount = NeuronsCount;
-            this.InputsCount = InputsCount;
-            setLayerWeights();
+            if (inputShape.DimensionsCount != 2)
+                throw new ArgumentException("Wrong inputShape shape dimensions for fully connected layer. Should be 2 dimensions");
         }
 
-        public FullyConnectedLayer(FullyConnectedLayer layer)
+        static Neuron[] createNeurons(Shape inputShape, LayerType type, Function<float, float> activationFunction)
         {
-            Neurons = new Neuron[layer.Neurons.Length];
+            int neuronsCount = inputShape[0];
+            int neuronsInputsCount = inputShape[1];
 
-            for (int neuron = 0; neuron < Neurons.Length; neuron++)
-                Neurons[neuron] = new Neuron(layer.Neurons[neuron]);
+            Neuron[] neurons = new Neuron[neuronsCount];
 
-            Type = layer.Type;
+            for (int i = 0; i < neuronsCount; i++)
+                neurons[i] = new Neuron(neuronsInputsCount, type, activationFunction);
 
-            OutputsCount = Neurons.Length;
-            InputsCount = layer.InputsCount;
-            setLayerWeights();
+            return neurons;
         }
 
         #region public Methods
 
-        public override double[] FeedForward(double[] inputs)
+        public override MultiDimArr FeedForward(MultiDimArr inputs)
         {
-            if (InputsCount != inputs.Length)
-                throw new ArgumentException("Neurons of the layer don't accept the number of given inputs");
+            inputs = inputs.TryReshape(Topology.InputShape);
 
-            if (Type == LayerType.InputLayer)
+            if (Topology.Type == LayerType.InputLayer)
                 return inputs;
 
-            double[] outputs = new double[OutputsCount];
+            float[] outputs = new float[Topology.OutputShape[0]];
 
-            for (int i = 0; i < Neurons.Length; i++)
-                outputs[i] = Neurons[i].FeedForward(inputs);
+            for (int i = 0; i < Topology.Neurons.Length; i++)
+                outputs[i] = Topology.Neurons[i].FeedForward(inputs);
 
-            return outputs;
+            return new MultiDimArr(outputs, Topology.OutputShape);
         }
 
-        public override double[] BackPropagation(double[] errors)
+        public override MultiDimArr BackPropagation(MultiDimArr errors)
         {
-            if (OutputsCount != errors.Length)
-                throw new ArgumentException("Errors vector doesn't match the layer neurons count");
+            errors = errors.TryReshape(Topology.OutputShape);
 
-            double[] deltas = new double[errors.Length];
+            float[] deltas = new float[errors.Length];
 
-            for (int i = 0; i < Neurons.Length; i++)
-                deltas[i] = Neurons[i].BackPropagation(errors[i]);
+            for (int i = 0; i < errors.Length; i++)
+                deltas[i] = Topology.Neurons[i].BackPropagation(errors[i]);
 
-            return deltas;
+            return propagateErrors(deltas);
         }
 
-        public override double[] BackPropagation(double[] nextLayerDeltas, double[][] nextLayerWeights)
-        {
-            if (Type == LayerType.InputLayer)
-                return nextLayerDeltas;
-
-            if (nextLayerDeltas.Length != nextLayerWeights.Length)
-                throw new ArgumentException("Number of errors and neuron's weights doen't match");
-
-            double[] thisLayerErrors = propagateErrors(nextLayerDeltas, nextLayerWeights);
-            double[] thisLaterDeltas = new double[thisLayerErrors.Length];
-
-            for (int i = 0; i < Neurons.Length; i++)
-                thisLaterDeltas[i] = Neurons[i].BackPropagation(thisLayerErrors[i]);
-
-            return thisLaterDeltas;
-        }
-
-        public override void UpdateDerivatives(double learningRate, double regularizationFactor, double trainingDatasetSize)
+        public override void UpdateDerivatives(float learningRate, float regularizationFactor, int trainingDatasetSize)
         {
             if (Type == LayerType.InputLayer)
                 return;
@@ -105,11 +68,11 @@ namespace NeuralNetworkLib.Layers
 
         public override string ToString()
         {
-            string res = $"{Type}, inputs {InputsCount}, outputs {OutputsCount}:\n";
+            string res = $"Fully connected {Topology.Type}, input shape: {Topology.InputShape}, output shape: {Topology.OutputShape}:\n";
 
-            foreach (var neuron in Neurons)
+            foreach (var neuron in Topology.Neurons)
             {
-                res += "\n    " + neuron.ToString();
+                res += "\n\t" + neuron.ToString();
             }
 
             return res + "\n\n";
@@ -121,10 +84,9 @@ namespace NeuralNetworkLib.Layers
         /// <summary>
         /// Back propagate the error
         /// </summary>
-        /// <param name="nextLayerErrors">errors from the next layer</param>
-        /// <param name="nextLayerWeights">weights from the next layer</param>
-        /// <returns>appropriate errors for the layer</returns>
-        double[] propagateErrors(double[] nextLayerErrors, double[][] nextLayerWeights)
+        /// <param name="deltas">neurons' deltas from the layer</param>
+        /// <returns>appropriate errors for the previous layer</returns>
+        double[] propagateErrors(float[] deltas)
         {
             double[] thisLayerErrors = new double[Neurons.Length];
 
@@ -134,5 +96,6 @@ namespace NeuralNetworkLib.Layers
 
             return thisLayerErrors;
         }
+
     }
 }

@@ -7,38 +7,6 @@ using System.Threading.Tasks;
 
 namespace NeuralNetworkLib.Layers
 {
-    [Serializable]
-    struct Shape
-    {
-        int width;
-        int height;
-        int 
-        public Shape(int width, int height)
-        {
-            this.width = width;
-            this.height = height;
-        }
-
-        public static Shape operator -(Shape first, Shape second)
-        {
-            return new Shape(first.width - second.width, first.height - second.height);
-        }
-
-        public static Shape operator +(Shape first, Shape second)
-        {
-            return new Shape(first.width + second.width, first.height + second.height);
-        }
-
-        public static Shape operator -(Shape first, int term)
-        {
-            return new Shape(first.width - term, first.height - term);
-        }
-
-        public static Shape operator +(Shape first, int term)
-        {
-            return new Shape(first.width + term, first.height + term);
-        }
-    }
 
     [Serializable]
     public class ConvolutionalLayer : Layer
@@ -58,7 +26,7 @@ namespace NeuralNetworkLib.Layers
             this.InputsCount = InputsCount;
             setLayerWeights();
         }
-
+        
         public ConvolutionalLayer(Shape inputShape, Shape outputShape, int depth, int filtersCount)
         {
             this.inputShape = inputShape;
